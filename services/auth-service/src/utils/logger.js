@@ -10,7 +10,6 @@ const logger = winston.createLogger({
     winston.format.json(),
   ),
   defaultMeta: { service: "auth-service" },
-
   transports: [
     new winston.transports.File({
       filename: "logs/error.log",
@@ -18,7 +17,6 @@ const logger = winston.createLogger({
       maxsize: 5242880,
       maxFiles: 5,
     }),
-
     new winston.transports.File({
       filename: "logs/combined.log",
       maxsize: 5242880,

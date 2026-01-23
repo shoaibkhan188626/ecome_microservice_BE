@@ -1,13 +1,16 @@
 import mongoose from "mongoose";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import config from "../../config/index.js";
 
-/**User's Entity with advanced security features
+/**
+ * User Entity with advanced security features
  *
- * Performance optimizations :
- * compound indexes for common queries
- * Lean queries support
- * Select field projection
+ * Performance Optimizations:
+ * - Compound indexes for common queries
+ * - Lean queries support
+ * - Select field projection
+ *
+ * Time Complexity for queries with indexes: O(log n)
  */
 
 const userSchema = new mongoose.Schema(
@@ -18,69 +21,58 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
+      index: true, // O(log n) lookup
       match: [/^\S+@\S+\.\S+$/, "Invalid email format"],
     },
-
     password: {
       type: String,
       required: [true, "Password is required"],
-      minLength: [8, "Password must be at least 8 characters"],
-      select: false,
+      minlength: [8, "Password must be at least 8 characters"],
+      select: false, // Don't return password by default
     },
-
     firstName: {
       type: String,
       required: [true, "First name is required"],
       trim: true,
-      maxLength: [50, "First name too long"],
+      maxlength: [50, "First name too long"],
     },
-
     lastName: {
       type: String,
       required: [true, "Last name is required"],
       trim: true,
-      maxLength: [50, "Last name is too strong"],
+      maxlength: [50, "Last name too long"],
     },
-
     phone: {
       type: String,
       trim: true,
       match: [/^\+?[\d\s-()]+$/, "Invalid phone format"],
     },
-
     role: {
       type: String,
       enum: Object.values(config.roles),
       default: config.roles.CUSTOMER,
-      index: true,
+      index: true, // For role-based queries
     },
-
-    isEmailedVerified: {
+    isEmailVerified: {
       type: Boolean,
       default: false,
     },
-
     isActive: {
       type: Boolean,
       default: true,
-      index: true,
+      index: true, // For filtering active users
     },
-
-    //security fields
+    // Security fields
     loginAttempts: {
       type: Number,
       default: 0,
     },
-
     lockUntil: {
       type: Date,
     },
-
     passwordChangedAt: {
       type: Date,
     },
-
     refreshTokens: [
       {
         token: String,
@@ -88,8 +80,7 @@ const userSchema = new mongoose.Schema(
         expiresAt: Date,
       },
     ],
-
-    //Oauth fields
+    // OAuth fields
     oauthProvider: {
       type: String,
       enum: ["local", "google", "facebook", "github"],
@@ -97,10 +88,9 @@ const userSchema = new mongoose.Schema(
     },
     oauthId: {
       type: String,
-      sparse: true,
+      sparse: true, // Allows null values with index
     },
-
-    //metadata
+    // Metadata
     lastLogin: {
       type: Date,
     },
@@ -109,7 +99,7 @@ const userSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
+    timestamps: true, // Adds createdAt and updatedAt
     toJSON: {
       virtuals: true,
       transform: function (doc, ret) {
@@ -123,35 +113,41 @@ const userSchema = new mongoose.Schema(
 );
 
 /**
- * compound indexes for performance
+ * Compound Indexes for Performance
+ * O(log n) lookup time for indexed queries
  */
-
-userSchema.index({ email: 1, isActive: 1 }); //common login query
-userSchema.index({ role: 1, isActive: 1 }); //role based filtering
-userSchema.index({ oauthProvider: 1, oauthId: 1 }); //OAuth lookup
-userSchema.index({ createdAt: -1 }); //recent users
+userSchema.index({ email: 1, isActive: 1 }); // Common login query
+userSchema.index({ role: 1, isActive: 1 }); // Role-based filtering
+userSchema.index({ oauthProvider: 1, oauthId: 1 }); // OAuth lookup
+userSchema.index({ createdAt: -1 }); // Recent users
 
 /**
  * Virtual for full name
+ * Time Complexity: O(1)
  */
-
 userSchema.virtual("fullName").get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
 
-/**virtual to check if account is locked */
+/**
+ * Virtual to check if account is locked
+ * Time Complexity: O(1)
+ */
 userSchema.virtual("isLocked").get(function () {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
 /**
  * Pre-save hook to hash password
- * uses bcrypt with configurable rounds for security
+ * Time Complexity: O(1) but computationally expensive (intentional)
+ * Uses bcrypt with configurable rounds for security
  */
 userSchema.pre("save", async function (next) {
+  // Only hash if password is modified
   if (!this.isModified("password")) return next();
 
   try {
+    // Hash password with salt rounds from config
     const salt = await bcrypt.genSalt(config.security.bcryptRounds);
     this.password = await bcrypt.hash(this.password, salt);
     this.passwordChangedAt = Date.now();
@@ -163,20 +159,22 @@ userSchema.pre("save", async function (next) {
 
 /**
  * Method to compare password
- * @param {string} candidatePassword
+ * Time Complexity: O(1) but computationally expensive
+ *
+ * @param {string} candidatePassword - Password to check
  * @returns {Promise<boolean>}
  */
-
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 /**
  * Method to increment login attempts
- * implements account lockout after max attempts
+ * Implements account lockout after max attempts
+ * Time Complexity: O(1) + database write
  */
-
 userSchema.methods.incLoginAttempts = async function () {
+  // Reset attempts if lock has expired
   if (this.lockUntil && this.lockUntil < Date.now()) {
     return await this.updateOne({
       $set: { loginAttempts: 1 },
@@ -186,19 +184,21 @@ userSchema.methods.incLoginAttempts = async function () {
 
   const updates = { $inc: { loginAttempts: 1 } };
 
+  // Lock account if max attempts exceeded
   if (
     this.loginAttempts + 1 >= config.security.maxLoginAttempts &&
     !this.isLocked
   ) {
     updates.$set = { lockUntil: Date.now() + config.security.lockoutTime };
   }
+
   return await this.updateOne(updates);
 };
 
 /**
- * Methods to reset Login Attempts
+ * Method to reset login attempts
+ * Time Complexity: O(1) + database write
  */
-
 userSchema.methods.resetLoginAttempts = async function () {
   return await this.updateOne({
     $set: { loginAttempts: 0 },
@@ -208,18 +208,18 @@ userSchema.methods.resetLoginAttempts = async function () {
 
 /**
  * Static method to find by email with active check
+ * Time Complexity: O(log n) due to compound index
  */
-
-userSchema.static.findByEmail = function (email) {
+userSchema.statics.findByEmail = function (email) {
   return this.findOne({ email, isActive: true });
 };
 
 /**
- * Static method for lean queries (improves the performance)
- * Returns a Plain JAVASCRIPT object instead of mongoose document
+ * Static method for lean queries (better performance)
+ * Returns plain JavaScript objects instead of Mongoose documents
+ * Time Complexity: O(log n) with index
  */
-
-userSchema.static.findByIdLean = function (id) {
+userSchema.statics.findByIdLean = function (id) {
   return this.findById(id).lean();
 };
 

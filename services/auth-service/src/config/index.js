@@ -50,23 +50,26 @@ class Config {
     return this.nodeEnv === "production";
   }
 
+  // JWT Configuration
   get jwt() {
     return {
       secret: process.env.JWT_SECRET,
       refreshSecret: process.env.JWT_REFRESH_SECRET,
-      accessExpiry: process.env.JWT_ACCESS_EXPIRES || "15m",
+      accessExpiry: process.env.JWT_ACCESS_EXPIRY || "15m",
       refreshExpiry: process.env.JWT_REFRESH_EXPIRY || "7d",
     };
   }
 
+  // Security Configuration
   get security() {
     return {
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 12,
       maxLoginAttempts: parseInt(process.env.MAX_LOGIN_ATTEMPTS, 10) || 5,
-      lockoutTime: parseInt(process.env.LOCKOUT_TIME, 10) || 900000,
+      lockoutTime: parseInt(process.env.LOCKOUT_TIME, 10) || 900000, // 15 minutes
     };
   }
 
+  // RBAC Roles (can be moved to database later)
   get roles() {
     return {
       SUPER_ADMIN: "super_admin",
@@ -77,9 +80,10 @@ class Config {
     };
   }
 
+  // Permissions mapping
   get permissions() {
     return {
-      super_admin: ["*"],
+      super_admin: ["*"], // All permissions
       admin: [
         "users:read",
         "users:write",
@@ -89,7 +93,6 @@ class Config {
         "orders:read",
         "orders:write",
       ],
-
       vendor: ["products:read", "products:write", "orders:read"],
       customer: [
         "products:read",
@@ -98,7 +101,6 @@ class Config {
         "cart:read",
         "cart:write",
       ],
-
       guest: ["products:read"],
     };
   }

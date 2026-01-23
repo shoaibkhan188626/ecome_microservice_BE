@@ -1,5 +1,7 @@
-// API Response wrapper
-
+/**
+ * Standard API response wrapper
+ * Time Complexity: O(1)
+ */
 class ResponseHandler {
   static success(res, data = null, statusCode = 200, requestId = null) {
     return res.status(statusCode).json({
@@ -8,7 +10,7 @@ class ResponseHandler {
       error: null,
       metadata: {
         timestamp: new Date().toISOString(),
-        requestId: requestId || res.locales.requestId,
+        requestId: requestId || res.locals.requestId,
         version: "v1",
       },
     });
@@ -25,7 +27,7 @@ class ResponseHandler {
       },
       metadata: {
         timestamp: new Date().toISOString(),
-        requestId: res.locales.requestId,
+        requestId: res.locals.requestId,
         version: "v1",
       },
     });
@@ -45,7 +47,7 @@ class ResponseHandler {
     return this.error(res, "UNAUTHORIZED", message, 401);
   }
 
-  static forbidden(res, message = "forbidden") {
+  static forbidden(res, message = "Forbidden") {
     return this.error(res, "FORBIDDEN", message, 403);
   }
 }
