@@ -1,16 +1,16 @@
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
-import config from "./config/index.js";
-import logger from "./utils/logger.js";
-import requestIdMiddleware from "./api/middlewares/requestId.js";
+import config from "./src/config/index.js";
+import logger from "./src/utils/logger.js";
+import requestIdMiddleware from "./src/api/middlewares/requestId.js";
 import rateLimiter, {
   strictRateLimiter,
-} from "./api/middlewares/rateLimiter.js";
-import errorHandler from "./api/middlewares/errorHandler.js";
-import proxyHandler from "./api/middlewares/proxyHandler";
-import healthRouter from "./api/routes/health.js";
-import cluster, { worker } from "cluster";
+} from "./src/api/middlewares/rateLimiter.js";
+import errorHandler from "./src/api/middlewares/errorHandler.js";
+import proxyHandler from "./src/api/middlewares/proxyHandler.js";
+import healthRouter from "./src/api/routes/health.js";
+import cluster from "cluster";
 import os from "os";
 
 /**
