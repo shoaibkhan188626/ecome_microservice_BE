@@ -1,15 +1,22 @@
 {
   "name": "auth-service",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Authentication and AUthorization Microservice",
+  "main": "src/index.js",
   "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "authentication",
+    "jwt",
+    "rbac",
+    "oauth2"
+  ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
