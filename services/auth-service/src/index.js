@@ -96,6 +96,8 @@ class AuthService {
     //Auth Routes
     this.app.use("/auth", authRoutes);
 
+    //temporarily printing all of working
+
     //404 handler
     this.app.use((req, res) => {
       res.status(404).json({

@@ -16,6 +16,7 @@ const router = express.Router();
  * All routes are prefixed with /auth from main app
  */
 
+
 //public routes (no authentication required)
 router.post("/register", validateRegister, authController.register);
 router.post("/login", validateLogin, authController.login);

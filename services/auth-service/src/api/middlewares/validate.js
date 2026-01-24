@@ -9,41 +9,50 @@ import ResponseHandler from "../../utils/responseHandler.js";
  * Validate registration data
  */
 
+/**
+ * Validate registration data
+ */
 export const validateRegister = (req, res, next) => {
   const { email, password, firstName, lastName } = req.body;
   const errors = [];
 
-  //email validation
+  // Email validation
   if (!email || !email.match(/^\S+@\S+\.\S+$/)) {
-    errors.push({ field: "email", message: "Valid email is required" });
+    errors.push({ field: 'email', message: 'Valid email is required' });
   }
 
-  //Password validation
+  // Password validation
   if (!password || password.length < 8) {
-    errors.push({
-      field: "password",
-      message: "Password must be at least 8 characters",
-    });
+    errors.push({ field: 'password', message: 'Password must be at least 8 characters' });
   }
 
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
-  if (password && passwordRegex.test(password)) {
-    errors.push({
-      field: "password",
-      message: "Password must contain uppercase, lowercase and number",
-    });
+  // Check password strength - must have uppercase, lowercase, and number
+  if (password) {
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+      errors.push({ 
+        field: 'password', 
+        message: 'Password must contain uppercase, lowercase, and number' 
+      });
+    }
   }
 
+  // Name validation
   if (!firstName || firstName.trim().length === 0) {
-    errors.push({ field: "firstName", message: "First name is required" });
+    errors.push({ field: 'firstName', message: 'First name is required' });
   }
 
   if (!lastName || lastName.trim().length === 0) {
-    errors.push({ field: "lastName", message: "Last name is required" });
+    errors.push({ field: 'lastName', message: 'Last name is required' });
   }
+
   if (errors.length > 0) {
-    return ResponseHandler.validationError(res, error);
+    return ResponseHandler.validationError(res, errors);
   }
+
   next();
 };
 

@@ -142,18 +142,17 @@ userSchema.virtual("isLocked").get(function () {
  * Time Complexity: O(1) but computationally expensive (intentional)
  * Uses bcrypt with configurable rounds for security
  */
-userSchema.pre("save", async function (next) {
+userSchema.pre('save', async function() {
   // Only hash if password is modified
-  if (!this.isModified("password")) return next();
+  if (!this.isModified('password')) return;
 
   try {
     // Hash password with salt rounds from config
     const salt = await bcrypt.genSalt(config.security.bcryptRounds);
     this.password = await bcrypt.hash(this.password, salt);
     this.passwordChangedAt = Date.now();
-    next();
   } catch (error) {
-    next(error);
+    throw error; // Let error propagate
   }
 });
 

@@ -3,6 +3,7 @@ version: '3.8'
 services:
   mongodb:
     image: mongo:latest
+    container_name: ecommerce-mongodb
     ports:
       - "27017:27017"
     environment:
@@ -10,17 +11,23 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=admin123
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - ecommerce-network
 
   redis:
     image: redis:latest
+    container_name: ecommerce-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    networks:
+      - ecommerce-network
 
   rabbitmq:
     image: rabbitmq:3-management
+    container_name: ecommerce-rabbitmq
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -29,8 +36,49 @@ services:
       - RABBITMQ_DEFAULT_PASS=admin123
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ecommerce-network
+
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: ecommerce-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672
+      - AUTH_SERVICE_URL=http://auth-service:3001
+    depends_on:
+      - redis
+      - rabbitmq
+    networks:
+      - ecommerce-network
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: ecommerce-auth
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/auth?authSource=admin
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-in-production-min-32-chars
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - ecommerce-network
 
 volumes:
   mongodb_data:
   redis_data:
   rabbitmq_data:
+
+networks:
+  ecommerce-network:
+    driver: bridge

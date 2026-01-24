@@ -8,7 +8,7 @@ import { randomUUID } from "crypto";
 const requestMiddleware = (req, res, next) => {
   const requestId = req.header["x-request-id"] || randomUUID();
   res.locals.requestId = requestId;
-  res.setHeaders("X-Request-Id", requestId);
+  res.setHeader("X-Request-Id", requestId);
   next();
 };
 
