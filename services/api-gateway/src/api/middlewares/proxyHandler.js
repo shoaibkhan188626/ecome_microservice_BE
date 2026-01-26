@@ -1,12 +1,12 @@
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import config from '../../config/index.js';
-import logger from '../../utils/logger.js';
+import { createProxyMiddleware } from "http-proxy-middleware";
+import config from "../../config/index.js";
+import logger from "../../utils/logger.js";
 
 /**
  * Dynamic proxy handler for microservices
  * Routes requests to appropriate backend services
  * Implements circuit breaker pattern for resilience
- * 
+ *
  * Time Complexity: O(1) - Direct routing based on path prefix
  */
 
@@ -20,7 +20,7 @@ class ProxyHandler {
 
   /**
    * Check if circuit breaker is open for a service
-   * @param {string} serviceName 
+   * @param {string} serviceName
    * @returns {boolean}
    */
   isCircuitOpen(serviceName) {
@@ -30,7 +30,7 @@ class ProxyHandler {
 
   /**
    * Record failure for circuit breaker
-   * @param {string} serviceName 
+   * @param {string} serviceName
    */
   recordFailure(serviceName) {
     const current = this.failureCount.get(serviceName) || 0;
@@ -56,9 +56,9 @@ class ProxyHandler {
       target,
       changeOrigin: true,
       pathRewrite: {
-        [`^${pathPrefix}`]: '', // Remove the path prefix when forwarding
+        [`^${pathPrefix}`]: "", // Remove the path prefix when forwarding
       },
-      
+
       // Add custom headers for tracing
       onProxyReq: (proxyReq, req, res) => {
         if (this.isCircuitOpen(serviceName)) {
@@ -66,7 +66,7 @@ class ProxyHandler {
           res.status(503).json({
             success: false,
             error: {
-              code: 'SERVICE_UNAVAILABLE',
+              code: "SERVICE_UNAVAILABLE",
               message: `${serviceName} service is temporarily unavailable`,
             },
           });
@@ -74,16 +74,16 @@ class ProxyHandler {
         }
 
         // Forward request ID for distributed tracing
-        proxyReq.setHeader('X-Request-Id', res.locals.requestId);
-        proxyReq.setHeader('X-Forwarded-For', req.ip);
-        
+        proxyReq.setHeader("X-Request-Id", res.locals.requestId);
+        proxyReq.setHeader("X-Forwarded-For", req.ip);
+
         logger.debug(`Proxying ${req.method} ${req.path} to ${serviceName}`);
       },
 
       // Handle proxy response
       onProxyRes: (proxyRes, req, res) => {
         logger.debug(`Response from ${serviceName}: ${proxyRes.statusCode}`);
-        
+
         // Reset failure count on successful response
         if (proxyRes.statusCode < 500) {
           this.failureCount.set(serviceName, 0);
@@ -98,7 +98,7 @@ class ProxyHandler {
         res.status(502).json({
           success: false,
           error: {
-            code: 'BAD_GATEWAY',
+            code: "BAD_GATEWAY",
             message: `Unable to reach ${serviceName} service`,
             details: config.isDevelopment ? err.message : null,
           },
@@ -121,12 +121,14 @@ class ProxyHandler {
    */
   getRoutes() {
     return [
-      { path: '/api/auth', service: 'auth' },
-      { path: '/api/catalog', service: 'catalog' },
-      { path: '/api/inventory', service: 'inventory' },
-      { path: '/api/cart', service: 'cart' },
-      { path: '/api/orders', service: 'order' },
-      { path: '/api/notifications', service: 'notification' },
+      { path: "/api/auth", service: "auth" },
+      { path: "/api/catalog", service: "catalog" }, // ADD THIS
+      { path: "/api/categories", service: "catalog" }, // ADD THIS
+      { path: "/api/products", service: "catalog" }, // ADD THIS
+      { path: "/api/inventory", service: "inventory" },
+      { path: "/api/cart", service: "cart" },
+      { path: "/api/orders", service: "order" },
+      { path: "/api/notifications", service: "notification" },
     ];
   }
 }

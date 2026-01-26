@@ -50,6 +50,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672
       - AUTH_SERVICE_URL=http://auth-service:3001
+      - CATALOG_SERVICE_URL=http://catalog-service:3002
     depends_on:
       - redis
       - rabbitmq
@@ -68,6 +69,22 @@ services:
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production-min-32-chars
       - JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-in-production-min-32-chars
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - ecommerce-network
+
+  catalog-service:
+    build: ./services/catalog-service
+    container_name: ecommerce-catalog
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/catalog?authSource=admin
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - mongodb
       - redis
