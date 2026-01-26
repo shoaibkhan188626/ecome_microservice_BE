@@ -65,7 +65,7 @@ class Config {
 
   get cache() {
     return {
-      tt: parseInt(process.env.REDIS_TTL, 10) || 3600,
+      ttl: parseInt(process.env.REDIS_TTL, 10) || 3600,
     };
   }
 }
