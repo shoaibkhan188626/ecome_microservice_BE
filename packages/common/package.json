@@ -1,0 +1,19 @@
+{
+  "name": "@ecommerce/common",
+  "version": "1.0.0",
+  "description": "Shared utilities and infrastructure for microservices",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Tests coming soon\""
+  },
+  "keywords": ["microservices", "shared", "common"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "winston": "^3.11.0",
+    "mongoose": "^8.0.3",
+    "ioredis": "^5.3.2",
+    "dotenv": "^16.3.1"
+  }
+}
