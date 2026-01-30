@@ -1,17 +1,19 @@
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
-import config from "./config/index.js";
+import config from "./src/config/index.js";
 import {
   createLogger,
   requestIdMiddleware,
   createErrorHandler,
 } from "@ecommerce/common";
+
 import rateLimiter, {
   strictRateLimiter,
-} from "./api/middlewares/rateLimiter.js";
-import proxyHandler from "./api/middlewares/proxyHandler.js";
-import healthRouter from "./api/routes/health.js";
+} from "./src/api/middlewares/rateLimiter.js";
+
+import proxyHandler from "./src/api/middlewares/proxyHandler.js";
+import healthRouter from "./src/api/routes/health.js";
 import cluster from "cluster";
 import os from "os";
 
