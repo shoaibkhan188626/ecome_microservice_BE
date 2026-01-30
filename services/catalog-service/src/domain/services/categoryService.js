@@ -1,15 +1,14 @@
 import Category from "../entities/Category.js";
-import logger from "../../utils/logger.js";
+import { createLogger } from "@ecommerce/common";
+import config from "../../config/index.js";
 
-/**
- * category service - business logic for categories
- * handles CRUD operations and tree management
- */
+const logger = createLogger(
+  "catalog-service",
+  config.logLevel,
+  config.isProduction,
+);
 
 class CategoryService {
-  /**
-   * create new category
-   */
   async create(data) {
     try {
       const {
@@ -22,7 +21,6 @@ class CategoryService {
         order,
       } = data;
 
-      //validate parent exists if provided
       if (parent) {
         const parentCategory = await Category.findById(parent);
         if (!parentCategory) {
@@ -46,14 +44,13 @@ class CategoryService {
       await category.save();
 
       logger.info(`Category created: ${category.name} (${category._id})`);
+
       return category;
     } catch (error) {
       logger.error("Create category error:", error);
       throw error;
     }
   }
-
-  /**Get category by ID */
 
   async getById(categoryId, includeInactive = false) {
     try {
@@ -66,9 +63,11 @@ class CategoryService {
         "parent",
         "name slug path",
       );
+
       if (!category) {
         throw new Error("Category not found");
       }
+
       return category;
     } catch (error) {
       logger.error("Get category error:", error);
@@ -76,53 +75,41 @@ class CategoryService {
     }
   }
 
-  /**
-   * Get category by slug
-   */
-
   async getBySlug(slug) {
     try {
       const category = await Category.findOne({
         slug,
         isActive: true,
       }).populate("parent", "name slug path");
+
       if (!category) {
         throw new Error("Category not found");
       }
+
       return category;
     } catch (error) {
-      logger.error("Get category");
+      logger.error("Get category by slug error:", error);
       throw error;
     }
   }
-
-  /**get all root (level 0 ) */
 
   async getRoots() {
     try {
       return await Category.findRoots();
     } catch (error) {
-      logger.error("Get Root categories error:", error);
+      logger.error("Get root categories error:", error);
       throw error;
     }
   }
-
-  /**
-   * get direct children of a Category
-   */
 
   async getChildren(categoryId) {
     try {
       return await Category.findChildren(categoryId);
     } catch (error) {
-      logger.error("Get Children error:", error);
+      logger.error("Get children error:", error);
       throw error;
     }
   }
-
-  /**
-   * get all descandants (recursive children)
-   */
 
   async getDescendants(categoryId) {
     try {
@@ -134,22 +121,15 @@ class CategoryService {
     }
   }
 
-  /**
-   * get full category tree
-   */
-
   async getTree(rootId = null) {
     try {
       return await Category.getTree(rootId);
     } catch (error) {
-      logger.error("get root category", error);
+      logger.error("Get tree error:", error);
       throw error;
     }
   }
 
-  /**
-   * Get bread crumb trail for a category
-   */
   async getBreadcrumbs(categoryId) {
     try {
       const category = await this.getById(categoryId);
@@ -162,9 +142,6 @@ class CategoryService {
     }
   }
 
-  /**
-   * Update category
-   */
   async update(categoryId, data) {
     try {
       const category = await Category.findById(categoryId);
@@ -172,6 +149,7 @@ class CategoryService {
       if (!category) {
         throw new Error("Category not found");
       }
+
       const {
         name,
         description,
@@ -182,29 +160,28 @@ class CategoryService {
         order,
         isActive,
       } = data;
+
       const isMoving =
         parent !== undefined && parent !== category.parent?.toString();
 
       if (isMoving) {
-        //validate new parent
         if (parent) {
           const newParent = await Category.findById(parent);
           if (!newParent) {
-            throw new Error("New Parent category not found");
+            throw new Error("New parent category not found");
           }
 
-          //prevent moving to own descendant
           if (newParent.path.startsWith(category.path)) {
             throw new Error("Cannot move category to its own descendant");
           }
         }
-        //Update parent reference
+
         category.parent = parent || null;
         await category.save();
 
-        //update all descendant paths
         await category.updateDescendantPaths(category.path);
       }
+
       if (name !== undefined) category.name = name;
       if (description !== undefined) category.description = description;
       if (image !== undefined) category.image = image;
@@ -216,7 +193,7 @@ class CategoryService {
 
       await category.save();
 
-      logger.info(`Category updated:${category.name} (${category._id})`);
+      logger.info(`Category updated: ${category.name} (${category._id})`);
 
       return category;
     } catch (error) {
@@ -224,10 +201,6 @@ class CategoryService {
       throw error;
     }
   }
-
-  /**
-   * Delete category
-   */
 
   async delete(categoryId) {
     try {
@@ -237,26 +210,22 @@ class CategoryService {
         throw new Error("Category not found");
       }
 
-      //get all descendants
       const descendants = await Category.findDescendants(category.path);
 
-      //check if category or descendants have products
-      //this will be implemented when we add product count
       if (category.productCount > 0) {
         throw new Error("Cannot delete category with products");
       }
 
-      //soft delete - mark as inactive
       category.isActive = false;
       await category.save();
 
-      //also delete all descendants
       if (descendants.length > 0) {
         await Category.updateMany(
           { _id: { $in: descendants.map((d) => d._id) } },
           { isActive: false },
         );
       }
+
       logger.info(
         `Category deleted (soft): ${category.name} (${category._id})`,
       );
@@ -268,13 +237,8 @@ class CategoryService {
     }
   }
 
-  /**
-   * Re-order categories
-   */
-
   async reorder(categoryOrders) {
     try {
-      //category orders [{id:'123',order:1},{id:'456',order:2}]
       const bulkOps = categoryOrders.map(({ id, order }) => ({
         updateOne: {
           filter: { _id: id },
@@ -288,19 +252,16 @@ class CategoryService {
 
       return { message: "Categories reordered successfully" };
     } catch (error) {
-      logger.error("Router categories error:", error);
+      logger.error("Reorder categories error:", error);
       throw error;
     }
   }
-
-  /**
-   * Search categories by name
-   */
 
   async search(query) {
     try {
       const categories = await Category.find({
         name: { $regex: query, $options: "i" },
+        isActive: true,
       })
         .limit(20)
         .sort({ name: 1 });
@@ -311,10 +272,6 @@ class CategoryService {
       throw error;
     }
   }
-
-  /**
-   * Get all categories (with pagination)
-   */
 
   async getAll(options = {}) {
     try {
@@ -335,7 +292,7 @@ class CategoryService {
       }
 
       if (level !== null) {
-        query.level - level;
+        query.level = level;
       }
 
       if (parent !== null) {

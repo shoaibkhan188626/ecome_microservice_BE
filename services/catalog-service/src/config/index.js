@@ -1,33 +1,8 @@
-import dotenv from "dotenv";
-dotenv.config();
+import { BaseConfig } from "@ecommerce/common";
 
-/**
- * Centralized configuration management for catalog Service
- * All environment variables are validated on Startup
- */
-
-class Config {
-  constructor() {
-    this.validateRequiredEnvVars();
-  }
-
-  validateRequiredEnvVars() {
-    const required = ["PORT", "MONGODB_URI"];
-    const missing = required.filter((key) => !process.env[key]);
-
-    if (missing.length > 0) {
-      throw new Error(
-        `Missing required environment variables: ${missing.join(", ")}`,
-      );
-    }
-  }
-
-  get nodeEnv() {
-    return process.env.NODE_ENV || "development";
-  }
-
-  get port() {
-    return parseInt(process.env.PORT, 10) || 3002;
+class Config extends BaseConfig {
+  getRequiredEnvVars() {
+    return ["PORT", "MONGODB_URI"];
   }
 
   get mongoUri() {
@@ -38,19 +13,7 @@ class Config {
     return process.env.REDIS_URL;
   }
 
-  get logLevel() {
-    return process.env.LOG_LEVEL || "info";
-  }
-
-  get isDevelopment() {
-    return this.nodeEnv === "development";
-  }
-
-  get isProduction() {
-    return this.nodeEnv === "production";
-  }
-
-  //pagination
+  // Pagination Configuration
   get pagination() {
     return {
       defaultPageSize: parseInt(process.env.DEFAULT_PAGE_SIZE, 10) || 20,
@@ -58,6 +21,7 @@ class Config {
     };
   }
 
+  // Redis Cache Configuration
   get cache() {
     return {
       ttl: parseInt(process.env.REDIS_TTL, 10) || 3600,
@@ -65,17 +29,20 @@ class Config {
     };
   }
 
+  // Image Processing Configuration
   get images() {
     return {
       maxSize: parseInt(process.env.MAX_IMAGE_SIZE, 10) || 5242880,
       allowedTypes: (
         process.env.ALLOWED_IMAGE_TYPES || "image/jpeg,image/png,image/webp"
       ).split(","),
-      thumbnailSizes:
-        process.env.THUMBNAIL_SIZES || "200x200,400x400,800x800".split(","),
+      thumbnailSizes: (
+        process.env.THUMBNAIL_SIZES || "200x200,400x400,800x800"
+      ).split(","),
     };
   }
 
+  // Search Configuration
   get search() {
     return {
       enabled: process.env.ENABLE_SEARCH === "true",
