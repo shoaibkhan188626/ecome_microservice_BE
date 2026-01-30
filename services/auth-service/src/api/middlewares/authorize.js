@@ -1,43 +1,48 @@
-import ResponseHandler from "../../utils/responseHandler.js";
-import logger from "../../utils/logger.js";
+import { ResponseHandler, createLogger } from "@ecommerce/common";
+import config from "../../config/index.js";
 
-/**
- * Role based access control (RBAC) middleware
- * check if user has required role or permission
- */
-
-/**
- * Check if user has required role
- * @param {Array<string>} allowedRoles -Array of allowed roles
- * @returns {Function} express middleware
- */
+const logger = createLogger(
+  "auth-service",
+  config.logLevel,
+  config.isProduction,
+);
 
 export const authorizeRole = (allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return ResponseHandler.unauthorized(res, "Authentication required");
+      return ResponseHandler.error(
+        res,
+        "UNAUTHORIZED",
+        "Authentication required",
+        401,
+      );
     }
 
     if (!allowedRoles.includes(req.user.role)) {
       logger.warn(
-        `Access denied for  user ${req.user.email} with role ${req.user.role}`,
+        `Access denied for user ${req.user.email} with role ${req.user.role}`,
       );
-      return ResponseHandler.forbidden(res, "Insufficient permissions");
+      return ResponseHandler.error(
+        res,
+        "FORBIDDEN",
+        "Insufficient permissions",
+        403,
+      );
     }
+
     next();
   };
 };
 
-/**
- * check if user has required role permission
- * @param {string} requiredPermission - Required permission (e.g., 'Product:write)
- * @returns {Function} express middleware
- */
-
 export const authorizePermission = (requiredPermission) => {
   return (req, res, next) => {
     if (!req.user) {
-      return ResponseHandler.unauthorized(res, "Authentication required");
+      return ResponseHandler.error(
+        res,
+        "UNAUTHORIZED",
+        "Authentication required",
+        401,
+      );
     }
 
     const userPermissions = req.user.permissions || [];
@@ -48,31 +53,33 @@ export const authorizePermission = (requiredPermission) => {
 
     if (!userPermissions.includes(requiredPermission)) {
       logger.warn(
-        `Permission denied: ${req.user.email} need ${requiredPermission}`,
+        `Permission denied: ${req.user.email} needs ${requiredPermission}`,
       );
-      return ResponseHandler.forbidden(
+      return ResponseHandler.error(
         res,
+        "FORBIDDEN",
         `Permission required: ${requiredPermission}`,
+        403,
       );
     }
+
     next();
   };
 };
 
-/**
- * check if user owns the resource (self-access)
- * @param {string} paramName - Name of the route parameter containing user ID
- * @returns {Function} express middleware
- */
-
 export const authorizeSelf = (paramName = "userId") => {
   return (req, res, next) => {
     if (!req.user) {
-      return ResponseHandler.unauthorized(res, "Authentication required");
+      return ResponseHandler.error(
+        res,
+        "UNAUTHORIZED",
+        "Authentication required",
+        401,
+      );
     }
+
     const resourceUserId = req.params[paramName];
 
-    //Allow if user is accessing their own resourc or is admin
     if (
       req.user.id !== resourceUserId &&
       !["admin", "super_admin"].includes(req.user.role)
@@ -80,8 +87,9 @@ export const authorizeSelf = (paramName = "userId") => {
       logger.warn(
         `Self-access denied: ${req.user.email} tried to access ${resourceUserId}`,
       );
-      return ResponseHandler.forbidden(res, "Access denied");
+      return ResponseHandler.error(res, "FORBIDDEN", "Access denied", 403);
     }
+
     next();
   };
 };
