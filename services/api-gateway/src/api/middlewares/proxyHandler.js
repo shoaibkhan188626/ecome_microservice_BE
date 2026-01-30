@@ -1,6 +1,6 @@
 import { createProxyMiddleware } from "http-proxy-middleware";
 import config from "../../config/index.js";
-import logger from "../../utils/logger.js";
+import { createLogger } from "@ecommerce/common";
 
 /**
  * Dynamic proxy handler for microservices
@@ -10,45 +10,35 @@ import logger from "../../utils/logger.js";
  * Time Complexity: O(1) - Direct routing based on path prefix
  */
 
+const logger = createLogger(
+  "api-gateway",
+  config.logLevel,
+  config.isProduction,
+);
+
 class ProxyHandler {
   constructor() {
     this.services = config.services;
-    this.failureCount = new Map(); // Track service failures
-    this.circuitBreakerThreshold = 5; // Open circuit after 5 failures
-    this.resetTimeout = 60000; // Reset circuit after 1 minute
+    this.failureCount = new Map();
+    this.circuitBreakerThreshold = 5;
+    this.resetTimeout = 60000;
   }
 
-  /**
-   * Check if circuit breaker is open for a service
-   * @param {string} serviceName
-   * @returns {boolean}
-   */
   isCircuitOpen(serviceName) {
     const failures = this.failureCount.get(serviceName) || 0;
     return failures >= this.circuitBreakerThreshold;
   }
 
-  /**
-   * Record failure for circuit breaker
-   * @param {string} serviceName
-   */
   recordFailure(serviceName) {
     const current = this.failureCount.get(serviceName) || 0;
     this.failureCount.set(serviceName, current + 1);
 
-    // Auto-reset after timeout
     setTimeout(() => {
       this.failureCount.set(serviceName, 0);
       logger.info(`Circuit breaker reset for ${serviceName}`);
     }, this.resetTimeout);
   }
 
-  /**
-   * Create proxy middleware for a specific service
-   * @param {string} serviceName - Name of the microservice
-   * @param {string} pathPrefix - URL path prefix (e.g., '/api/auth')
-   * @returns {Function} Express middleware
-   */
   createProxy(serviceName, pathPrefix) {
     const target = this.services[serviceName];
 
@@ -56,10 +46,9 @@ class ProxyHandler {
       target,
       changeOrigin: true,
       pathRewrite: {
-        [`^${pathPrefix}`]: "", // Remove the path prefix when forwarding
+        [`^${pathPrefix}`]: "",
       },
 
-      // Add custom headers for tracing
       onProxyReq: (proxyReq, req, res) => {
         if (this.isCircuitOpen(serviceName)) {
           logger.error(`Circuit breaker OPEN for ${serviceName}`);
@@ -73,24 +62,20 @@ class ProxyHandler {
           return;
         }
 
-        // Forward request ID for distributed tracing
         proxyReq.setHeader("X-Request-Id", res.locals.requestId);
         proxyReq.setHeader("X-Forwarded-For", req.ip);
 
         logger.debug(`Proxying ${req.method} ${req.path} to ${serviceName}`);
       },
 
-      // Handle proxy response
       onProxyRes: (proxyRes, req, res) => {
         logger.debug(`Response from ${serviceName}: ${proxyRes.statusCode}`);
 
-        // Reset failure count on successful response
         if (proxyRes.statusCode < 500) {
           this.failureCount.set(serviceName, 0);
         }
       },
 
-      // Handle proxy errors (circuit breaker pattern)
       onError: (err, req, res) => {
         logger.error(`Proxy error for ${serviceName}:`, err.message);
         this.recordFailure(serviceName);
@@ -109,22 +94,17 @@ class ProxyHandler {
         });
       },
 
-      // Timeout configuration
-      proxyTimeout: 30000, // 30 seconds
+      proxyTimeout: 30000,
       timeout: 30000,
     });
   }
 
-  /**
-   * Get all proxy routes configuration
-   * @returns {Array} Array of route configurations
-   */
   getRoutes() {
     return [
       { path: "/api/auth", service: "auth" },
-      { path: "/api/catalog", service: "catalog" }, // ADD THIS
-      { path: "/api/categories", service: "catalog" }, // ADD THIS
-      { path: "/api/products", service: "catalog" }, // ADD THIS
+      { path: "/api/catalog", service: "catalog" },
+      { path: "/api/categories", service: "catalog" },
+      { path: "/api/products", service: "catalog" },
       { path: "/api/inventory", service: "inventory" },
       { path: "/api/cart", service: "cart" },
       { path: "/api/orders", service: "order" },

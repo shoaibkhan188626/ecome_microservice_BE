@@ -1,5 +1,5 @@
 import express from "express";
-import ResponseHandler from "../../utils/responseHandler.js";
+import { ResponseHandler } from "@ecommerce/common";
 import config from "../../config/index.js";
 import os from "os";
 

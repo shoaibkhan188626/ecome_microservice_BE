@@ -1,12 +1,17 @@
 import rateLimit from "express-rate-limit";
 import config from "../../config/index.js";
-import logger from "../../utils/logger.js";
-import ResponseHandler from "../../utils/responseHandler.js";
+import { createLogger, ResponseHandler } from "@ecommerce/common";
 
 /**
  * Token Bucket Algorithm implementation
  * More flexible than fixed window - allows bursts while maintaining average rate
  */
+
+const logger = createLogger(
+  "api-gateway",
+  config.logLevel,
+  config.isProduction,
+);
 
 const rateLimiter = rateLimit({
   windowMs: config.rateLimiting.windowMs,
