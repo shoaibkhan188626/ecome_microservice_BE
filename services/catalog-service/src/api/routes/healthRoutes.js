@@ -1,17 +1,23 @@
 import express from "express";
-import ResponseHandler from "../../utils/responseHandler.js";
-import databaseConnection from "../../infrastructure/database/connection.js";
+import {
+  ResponseHandler,
+  MongoConnection,
+  createLogger,
+} from "@ecommerce/common";
 import config from "../../config/index.js";
 import os from "os";
 
 const router = express.Router();
-/**
- * Health check endpoints
- * GET /health
- */
+const logger = createLogger(
+  "catalog-service",
+  config.logLevel,
+  config.isProduction,
+);
+
+const dbConnection = new MongoConnection(logger);
 
 router.get("/health", (req, res) => {
-  const dbStatus = databaseConnection.getStatus();
+  const dbStatus = dbConnection.getStatus();
 
   const healthData = {
     status: dbStatus.isConnected ? "UP" : "DOWN",
@@ -22,7 +28,7 @@ router.get("/health", (req, res) => {
     version: "1.0.0",
     database: {
       connected: dbStatus.isConnected,
-      readState: dbStatus.readyState,
+      readyState: dbStatus.readyState,
       host: dbStatus.host,
       name: dbStatus.name,
     },
@@ -44,13 +50,8 @@ router.get("/health", (req, res) => {
   return res.status(statusCode).json(healthData);
 });
 
-/**
- * Readiness probe
- * GET /ready
- */
-
 router.get("/ready", (req, res) => {
-  const dbStatus = databaseConnection.getStatus();
+  const dbStatus = dbConnection.getStatus();
   const isReady = dbStatus.isConnected;
 
   if (isReady) {
@@ -62,12 +63,9 @@ router.get("/ready", (req, res) => {
   }
 });
 
-/**
- * liveness probe
- * GET /live
- */
 router.get("/live", (req, res) => {
   ResponseHandler.success(res, { alive: true });
 });
 
+export { dbConnection };
 export default router;

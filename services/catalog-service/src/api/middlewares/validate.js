@@ -1,8 +1,4 @@
-import ResponseHandler from "../../utils/responseHandler.js";
-
-/**
- * validate category creation/update
- */
+import { ResponseHandler, validators } from "@ecommerce/common";
 
 export const validateCategory = (req, res, next) => {
   const { name } = req.body;
@@ -22,16 +18,12 @@ export const validateCategory = (req, res, next) => {
   if (errors.length > 0) {
     return ResponseHandler.validationError(res, errors);
   }
+
   next();
 };
 
-/**
- * validate product creation/update
- */
-
 export const validateProduct = (req, res, next) => {
   const { name, description, category, basePrice, sku } = req.body;
-
   const errors = [];
 
   if (!name || name.trim().length === 0) {
@@ -50,7 +42,7 @@ export const validateProduct = (req, res, next) => {
   }
 
   if (basePrice === undefined || basePrice === null) {
-    errors.push({ field: "base", message: "Base price is required" });
+    errors.push({ field: "basePrice", message: "Base price is required" });
   }
 
   if (basePrice < 0) {
@@ -68,10 +60,6 @@ export const validateProduct = (req, res, next) => {
   next();
 };
 
-/**
- * validate pagination parameters
- */
-
 export const validatePagination = (req, res, next) => {
   const { page, limit } = req.query;
 
@@ -86,5 +74,6 @@ export const validatePagination = (req, res, next) => {
       { field: "limit", message: "Limit must be between 1 and 100" },
     ]);
   }
+
   next();
 };

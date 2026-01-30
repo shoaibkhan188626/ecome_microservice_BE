@@ -2,24 +2,19 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import config from "./config/index.js";
-import logger from "./utils/logger.js";
-import databaseConnection from "./infrastructure/database/connection.js";
-import requestIdMiddleware from "./api/middlewares/requestId.js";
-import errorHandler from "./api/middlewares/errorHandler.js";
-import healthRoutes from "./api/routes/healthRoutes.js";
+import {
+  createLogger,
+  requestIdMiddleware,
+  createErrorHandler,
+} from "@ecommerce/common";
+import healthRoutes, { dbConnection } from "./api/routes/healthRoutes.js";
 import apiRoutes from "./api/routes/index.js";
 
-/**
- * Catalog service - Product & category management
- *
- * Features:
- * - Infinite category nesting with materialized path
- * - EAV pattern for dynamic product attributes
- * - Full-text search (basic - Atlas Search ready)
- * - Product variants for configurable products
- * - Image management
- * - Advanced filtering and pagination
- */
+const logger = createLogger(
+  "catalog-service",
+  config.logLevel,
+  config.isProduction,
+);
 
 class CatalogService {
   constructor() {
@@ -30,10 +25,7 @@ class CatalogService {
   }
 
   setupMiddlewares() {
-    //security headers
     this.app.use(helmet());
-
-    //CORS configuration
     this.app.use(
       cors({
         origin: config.isDevelopment
@@ -43,14 +35,11 @@ class CatalogService {
       }),
     );
 
-    //body parsing
     this.app.use(express.json({ limit: "10mb" }));
     this.app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-    //Request ID for distributed tracing
     this.app.use(requestIdMiddleware);
 
-    //Request logging
     this.app.use((req, res, next) => {
       logger.info(`${req.method} ${req.path}`, {
         requestId: res.locals.requestId,
@@ -62,16 +51,14 @@ class CatalogService {
   }
 
   setupRoutes() {
-    //Health check routes
     this.app.use("/", healthRoutes);
 
-    //welcome routes
     this.app.get("/", (req, res) => {
       res.json({
         service: "Catalog Service",
         version: "1.0.0",
         status: "operational",
-        endpoint: {
+        endpoints: {
           health: "/health",
           categories: "GET /api/categories",
           categoryTree: "GET /api/categories/tree",
@@ -83,10 +70,8 @@ class CatalogService {
       });
     });
 
-    //API routes
     this.app.use("/api", apiRoutes);
 
-    //404 handler
     this.app.use((req, res) => {
       res.status(404).json({
         success: false,
@@ -103,19 +88,17 @@ class CatalogService {
   }
 
   setupErrorHandling() {
-    this.app.use(errorHandler);
+    this.app.use(createErrorHandler(logger, config.isProduction));
   }
 
   async start() {
     try {
-      //connection to database
-      await databaseConnection.connect();
+      await dbConnection.connect(config.mongoUri);
 
-      //start http server
       this.app.listen(config.port, () => {
-        logger.info(`catalog service running on port ${config.port}`);
-        logger.info(`Environment: ${config.nodeEnv}`);
-        logger.info(`Process ID: ${process.pid}`);
+        logger.info(`🚀 Catalog Service running on port ${config.port}`);
+        logger.info(`📊 Environment: ${config.nodeEnv}`);
+        logger.info(`👷 Process ID: ${process.pid}`);
       });
     } catch (error) {
       logger.error("Failed to start server:", error);
@@ -124,19 +107,17 @@ class CatalogService {
   }
 }
 
-//initialize and start the service
 const catalogService = new CatalogService();
 catalogService.start();
 
-//graceful shutdown
 process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received. shutting down gracefully...");
-  await databaseConnection.disconnect();
+  logger.info("SIGTERM received. Shutting down gracefully...");
+  await dbConnection.disconnect();
   process.exit(0);
 });
 
 process.on("uncaughtException", (err) => {
-  logger.error("Uncaught exception:", err);
+  logger.error("Uncaught Exception:", err);
   process.exit(1);
 });
 
