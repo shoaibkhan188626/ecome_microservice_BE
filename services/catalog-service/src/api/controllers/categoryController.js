@@ -1,13 +1,14 @@
 import categoryService from "../../domain/services/categoryService.js";
-import ResponseHandler from "../../utils/responseHandler.js";
-import logger from "../../utils/logger.js";
+import { ResponseHandler, createLogger } from "@ecommerce/common";
+import config from "../../config/index.js";
+
+const logger = createLogger(
+  "catalog-service",
+  config.logLevel,
+  config.isProduction,
+);
 
 class CategoryController {
-  /**
-   * Create category
-   * POST /categories
-   */
-
   async create(req, res) {
     try {
       const category = await categoryService.create(req.body);
@@ -21,11 +22,6 @@ class CategoryController {
     }
   }
 
-  /**
-   * Get category by ID
-   * GET /categories/:id
-   */
-
   async getById(req, res) {
     try {
       const category = await categoryService.getById(req.params.id);
@@ -35,11 +31,6 @@ class CategoryController {
       return ResponseHandler.notFound(res, "Category");
     }
   }
-
-  /**
-   * Get category by slug
-   * GET /categories/slug/:slug
-   */
 
   async getBySlug(req, res) {
     try {
@@ -51,11 +42,6 @@ class CategoryController {
     }
   }
 
-  /**
-   * Get root categories
-   * GET /categories/roots
-   */
-
   async getRoots(req, res) {
     try {
       const categories = await categoryService.getRoots();
@@ -65,11 +51,6 @@ class CategoryController {
       return ResponseHandler.error(res, "FETCH_FAILED", error.message, 500);
     }
   }
-
-  /**
-   * get category children
-   * GET /categories/:id/children
-   */
 
   async getChildren(req, res) {
     try {
@@ -81,40 +62,25 @@ class CategoryController {
     }
   }
 
-  /**
-   * Get category tree
-   * GET /categories/tree
-   */
-
   async getTree(req, res) {
     try {
       const tree = await categoryService.getTree();
       return ResponseHandler.success(res, tree);
     } catch (error) {
-      logger.error("Get tree controller error", error);
+      logger.error("Get tree controller error:", error);
       return ResponseHandler.error(res, "FETCH_FAILED", error.message, 500);
     }
   }
 
-  /**
-   * Get breadcrumbs
-   * GET /categories/:id/breadcrumbs
-   */
-
-  async getBreadCrumbs(req, res) {
+  async getBreadcrumbs(req, res) {
     try {
-      const breadCrumbs = await categoryService.getBreadcrumbs(req.params.id);
-      return ResponseHandler.success(res, breadCrumbs);
+      const breadcrumbs = await categoryService.getBreadcrumbs(req.params.id);
+      return ResponseHandler.success(res, breadcrumbs);
     } catch (error) {
       logger.error("Get breadcrumbs error:", error);
       return ResponseHandler.notFound(res, "Category");
     }
   }
-
-  /**
-   * Update category
-   * PUT /categories/:id
-   */
 
   async update(req, res) {
     try {
@@ -129,11 +95,6 @@ class CategoryController {
     }
   }
 
-  /**
-   * Delete category
-   * DELETE /categories/:id
-   */
-
   async delete(req, res) {
     try {
       const result = await categoryService.delete(req.params.id);
@@ -141,16 +102,11 @@ class CategoryController {
     } catch (error) {
       logger.error("Delete category controller error:", error);
       if (error.message.includes("products")) {
-        return ResponseHandler.error(res, "HAS_PRODUCT", error.message, 400);
+        return ResponseHandler.error(res, "HAS_PRODUCTS", error.message, 409);
       }
       return ResponseHandler.error(res, "DELETE_FAILED", error.message, 400);
     }
   }
-
-  /**
-   * Get all categories (paginated)
-   * GET /categories
-   */
 
   async getAll(req, res) {
     try {
@@ -168,6 +124,7 @@ class CategoryController {
         res,
         result.categories,
         result.pagination.page,
+        result.pagination.limit,
         result.pagination.total,
       );
     } catch (error) {

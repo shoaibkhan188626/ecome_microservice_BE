@@ -1,13 +1,14 @@
 import productService from "../../domain/services/productService.js";
-import ResponseHandler from "../../utils/responseHandler.js";
-import logger from "../../utils/logger.js";
+import { ResponseHandler, createLogger } from "@ecommerce/common";
+import config from "../../config/index.js";
+
+const logger = createLogger(
+  "catalog-service",
+  config.logLevel,
+  config.isProduction,
+);
 
 class ProductController {
-  /**
-   * Create product
-   * POST /products
-   */
-
   async create(req, res) {
     try {
       const product = await productService.create(req.body);
@@ -29,11 +30,6 @@ class ProductController {
     }
   }
 
-  /**
-   * Get product by ID
-   * GET /products/:id
-   */
-
   async getById(req, res) {
     try {
       const product = await productService.getById(req.params.id);
@@ -44,11 +40,6 @@ class ProductController {
     }
   }
 
-  /**
-   * Get product by slug
-   * GET /product/slug/:slug
-   */
-
   async getBySlug(req, res) {
     try {
       const product = await productService.getBySlug(req.params.slug);
@@ -58,11 +49,6 @@ class ProductController {
       return ResponseHandler.notFound(res, "Product");
     }
   }
-
-  /**
-   * Get products by category
-   * GET /categories/:categoryId/products
-   */
 
   async getByCategory(req, res) {
     try {
@@ -93,11 +79,6 @@ class ProductController {
     }
   }
 
-  /**
-   * Get featured products
-   * GET /products/featured
-   */
-
   async getFeatured(req, res) {
     try {
       const limit = parseInt(req.query.limit) || 10;
@@ -108,11 +89,6 @@ class ProductController {
       return ResponseHandler.error(res, "FETCH_FAILED", error.message, 500);
     }
   }
-
-  /**
-   * search products
-   * GET /products/search?q=keyword
-   */
 
   async search(req, res) {
     try {
@@ -146,40 +122,15 @@ class ProductController {
     }
   }
 
-  /**
-   * Update product
-   * PUT /products/:id
-   */
-
   async update(req, res) {
     try {
       const product = await productService.update(req.params.id, req.body);
       return ResponseHandler.success(res, product);
     } catch (error) {
-      logger.error("Updated product controller error:", error);
-      return ResponseHandler.error(res, "UPDATED_FAILED", error.message, 400);
+      logger.error("Update product controller error:", error);
+      return ResponseHandler.error(res, "UPDATE_FAILED", error.message, 400);
     }
   }
-
-  /**
-   * Delete product
-   * DELETE /products/:id
-   */
-
-  async delete(req, res) {
-    try {
-      const result = await productService.delete(req.params.id);
-      return ResponseHandler.success(res, result);
-    } catch (error) {
-      logger.error("Delete product error:", error);
-      return ResponseHandler.error(res, "DELETE_FAILED", error.message, 400);
-    }
-  }
-
-  /**
-   * Delete product
-   * DELETE /products/:id
-   */
 
   async delete(req, res) {
     try {
@@ -191,11 +142,6 @@ class ProductController {
     }
   }
 
-  /**
-   * Get all products(admin)
-   * GET /products
-   */
-
   async getAll(req, res) {
     try {
       const options = {
@@ -204,12 +150,11 @@ class ProductController {
         sort: req.query.sort || "createdAt",
         order: req.query.order || "desc",
         status: req.query.status,
-        category: res.query.category,
+        category: req.query.category,
         search: req.query.search,
       };
 
       const result = await productService.getAll(options);
-
       return ResponseHandler.paginated(
         res,
         result.products,

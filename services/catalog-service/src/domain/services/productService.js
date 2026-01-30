@@ -1,18 +1,16 @@
 import Product from "../entities/Product.js";
 import ProductVariant from "../entities/ProductVariants.js";
 import Category from "../entities/Category.js";
-import logger from "../../utils/logger.js";
+import { createLogger } from "@ecommerce/common";
+import config from "../../config/index.js";
 
-/**
- * product service - business logic for products
- * Handles crud, search, filtering and variants
- */
+const logger = createLogger(
+  "catalog-service",
+  config.logLevel,
+  config.isProduction,
+);
 
 class ProductService {
-  /**
-   * Create new product
-   */
-
   async create(data) {
     try {
       const {
@@ -37,13 +35,11 @@ class ProductService {
         metaKeywords,
       } = data;
 
-      //validate category exists
       const categoryDoc = await Category.findById(category);
       if (!categoryDoc || !categoryDoc.isActive) {
         throw new Error("Invalid or inactive category");
       }
 
-      //Check sku uniqueness
       const existingProduct = await Product.findOne({ sku });
       if (existingProduct) {
         throw new Error("SKU already exists");
@@ -72,12 +68,11 @@ class ProductService {
         status: "draft",
       });
 
-      await Product.save();
+      await product.save();
 
-      //increment category product count
       await Category.findByIdAndUpdate(category, { $inc: { productCount: 1 } });
 
-      logger.info(`Product created : ${product.name} (${product._id})`);
+      logger.info(`Product created: ${product.name} (${product._id})`);
 
       return product;
     } catch (error) {
@@ -85,10 +80,6 @@ class ProductService {
       throw error;
     }
   }
-
-  /**
-   * Get product by ID
-   */
 
   async getById(productId, includeInactive = false) {
     try {
@@ -106,7 +97,6 @@ class ProductService {
         throw new Error("Product not found");
       }
 
-      //increment view count async
       product
         .incrementViewCount()
         .catch((err) => logger.error("View count error:", err));
@@ -117,10 +107,6 @@ class ProductService {
       throw error;
     }
   }
-
-  /**
-   * Get product by slug
-   */
 
   async getBySlug(slug) {
     try {
@@ -136,7 +122,6 @@ class ProductService {
         throw new Error("Product not found");
       }
 
-      //increment view Count
       product
         .incrementViewCount()
         .catch((err) => logger.error("View count error:", err));
@@ -147,10 +132,6 @@ class ProductService {
       throw error;
     }
   }
-
-  /**
-   * get products by category
-   */
 
   async getByCategory(categoryId, options = {}) {
     try {
@@ -171,12 +152,16 @@ class ProductService {
         status: "active",
       };
 
-      //price filter
+      if (minPrice || maxPrice) {
+        query.basePrice = {};
+        if (minPrice) query.basePrice.$gte = parseFloat(minPrice);
+        if (maxPrice) query.basePrice.$lte = parseFloat(maxPrice);
+      }
+
       if (brand) {
         query.brand = brand;
       }
 
-      //Attributes filters(EAV)
       Object.keys(attributes).forEach((attrName) => {
         query[`attributes.name`] = attrName;
         query[`attributes.value`] = attributes[attrName];
@@ -186,8 +171,8 @@ class ProductService {
       const sortObj = { [sort]: order === "asc" ? 1 : -1 };
 
       const [products, total] = await Promise.all([
-        (await Product.find(query))
-          .toSorted(sortObj)
+        Product.find(query)
+          .sort(sortObj)
           .skip(skip)
           .limit(limit)
           .populate("category", "name slug"),
@@ -209,10 +194,6 @@ class ProductService {
     }
   }
 
-  /**
-   * Get featured products
-   */
-
   async getFeatured(limit = 10) {
     try {
       return await Product.findFeatured(limit);
@@ -221,10 +202,6 @@ class ProductService {
       throw error;
     }
   }
-
-  /**
-   * Search products (basic text search)
-   */
 
   async search(query, options = {}) {
     try {
@@ -272,10 +249,6 @@ class ProductService {
     }
   }
 
-  /**
-   * Update product
-   */
-
   async update(productId, data) {
     try {
       const product = await Product.findById(productId);
@@ -298,7 +271,6 @@ class ProductService {
         });
       }
 
-      //update fields
       Object.keys(data).forEach((key) => {
         if (data[key] !== undefined && key !== "_id") {
           product[key] = data[key];
@@ -308,15 +280,13 @@ class ProductService {
       await product.save();
 
       logger.info(`Product updated: ${product.name} (${product._id})`);
+
+      return product;
     } catch (error) {
       logger.error("Update product error:", error);
       throw error;
     }
   }
-
-  /**
-   * Delete product (soft delete)
-   */
 
   async delete(productId) {
     try {
@@ -326,12 +296,10 @@ class ProductService {
         throw new Error("Product not found");
       }
 
-      //soft delete
       product.isActive = false;
       product.status = "archived";
       await product.save();
 
-      //decrement category count
       await Category.findByIdAndUpdate(product.category, {
         $inc: { productCount: -1 },
       });
@@ -345,10 +313,6 @@ class ProductService {
     }
   }
 
-  /**
-   * Add product attribute
-   */
-
   async addAttribute(productId, name, value, type = "string", unit = null) {
     try {
       const product = await Product.findById(productId);
@@ -359,16 +323,13 @@ class ProductService {
 
       product.setAttribute(name, value, type, unit);
       await product.save();
+
       return product;
     } catch (error) {
       logger.error("Add attribute error:", error);
       throw error;
     }
   }
-
-  /**
-   * Get all products (admin)
-   */
 
   async getAll(options = {}) {
     try {
@@ -386,7 +347,7 @@ class ProductService {
 
       if (status) query.status = status;
       if (category) query.category = category;
-      if (search) query.name = { $regex: search, $options: "1" };
+      if (search) query.name = { $regex: search, $options: "i" };
 
       const skip = (page - 1) * limit;
       const sortObj = { [sort]: order === "asc" ? 1 : -1 };
