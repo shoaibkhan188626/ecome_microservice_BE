@@ -1,20 +1,14 @@
 import authService from "../../domain/services/authService.js";
-import ResponseHandler from "../../utils/responseHandler.js";
-import logger from "../../utils/logger.js";
+import { ResponseHandler, createLogger } from "@ecommerce/common";
+import config from "../../config/index.js";
 
-/**
- * Authentication Controller
- * Handles HTTP requests for authentication endpoints
- *
- * all methods follow async/await pattern for non-blocking I/O
- */
+const logger = createLogger(
+  "auth-service",
+  config.logLevel,
+  config.isProduction,
+);
 
 class AuthController {
-  /**
-   * Register new user
-   * POST /auth/register
-   */
-
   async register(req, res) {
     try {
       const { email, password, firstName, lastName, phone, role } = req.body;
@@ -32,11 +26,12 @@ class AuthController {
 
       return ResponseHandler.success(res, result, 201);
     } catch (error) {
-      logger.error(`Register controller error:`, error);
+      logger.error("Register controller error:", error);
 
       if (error.message.includes("already exists")) {
         return ResponseHandler.error(res, "USER_EXISTS", error.message, 409);
       }
+
       return ResponseHandler.error(
         res,
         "REGISTRATION_FAILED",
@@ -46,11 +41,6 @@ class AuthController {
     }
   }
 
-  /**
-   * Login user
-   * POST /auth/login
-   */
-
   async login(req, res) {
     try {
       const { email, password } = req.body;
@@ -59,12 +49,15 @@ class AuthController {
       const result = await authService.login(email, password, ipAddress);
 
       logger.info(`User logged in: ${email}`);
+
       return ResponseHandler.success(res, result);
     } catch (error) {
       logger.error("Login controller error:", error);
+
       if (error.message.includes("locked")) {
         return ResponseHandler.error(res, "ACCOUNT_LOCKED", error.message, 423);
       }
+
       return ResponseHandler.error(
         res,
         "LOGIN_FAILED",
@@ -73,11 +66,6 @@ class AuthController {
       );
     }
   }
-
-  /**
-   * Refresh Access Token
-   * POST /auth/refresh
-   */
 
   async refreshToken(req, res) {
     try {
@@ -91,17 +79,11 @@ class AuthController {
       return ResponseHandler.error(
         res,
         "REFRESH_FAILED",
-        "invalid or expired token",
+        "Invalid or expired refresh token",
         401,
       );
     }
   }
-
-  /**
-   * Logout user
-   * POST /auth/logout
-   * requirest authentication
-   */
 
   async logout(req, res) {
     try {
@@ -119,12 +101,6 @@ class AuthController {
     }
   }
 
-  /**
-   * logout from all devices
-   * POST /auth/logout-all
-   * Requires authentication
-   */
-
   async logoutAll(req, res) {
     try {
       const userId = req.user.id;
@@ -140,12 +116,6 @@ class AuthController {
     }
   }
 
-  /**
-   * get current user profile
-   * GET /auth/me
-   * Requires authentication
-   */
-
   async getCurrentUser(req, res) {
     try {
       const userId = req.user.id;
@@ -154,16 +124,10 @@ class AuthController {
 
       return ResponseHandler.success(res, user);
     } catch (error) {
-      logger.error("Get current user error", error);
-      return ResponseHandler.error(res, "USER_NOT_FOUND", error.message, 400);
+      logger.error("Get current user error:", error);
+      return ResponseHandler.error(res, "USER_NOT_FOUND", error.message, 404);
     }
   }
-
-  /**
-   * Update user profile
-   * PUT /auth/profile
-   * Requires authentication
-   */
 
   async updateProfile(req, res) {
     try {
@@ -179,11 +143,6 @@ class AuthController {
     }
   }
 
-  /**change password
-   * POST /auth/change-password
-   * requires authentication
-   */
-
   async changePassword(req, res) {
     try {
       const userId = req.user.id;
@@ -196,6 +155,7 @@ class AuthController {
       });
     } catch (error) {
       logger.error("Change password error:", error);
+
       if (error.message.includes("incorrect")) {
         return ResponseHandler.error(
           res,
@@ -204,6 +164,7 @@ class AuthController {
           401,
         );
       }
+
       return ResponseHandler.error(
         res,
         "PASSWORD_CHANGE_FAILED",

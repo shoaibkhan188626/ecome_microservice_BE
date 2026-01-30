@@ -1,33 +1,8 @@
-import dotenv from "dotenv";
-dotenv.config();
+import { BaseConfig } from "@ecommerce/common";
 
-class Config {
-  constructor() {
-    this.validateRequiredEnvVars();
-  }
-
-  validateRequiredEnvVars() {
-    const required = [
-      "PORT",
-      "MONGODB_URI",
-      "JWT_SECRET",
-      "JWT_REFRESH_SECRET",
-    ];
-    const missing = required.filter((key) => !process.env[key]);
-
-    if (missing.length > 0) {
-      throw new Error(
-        `Missing required environment variables: ${missing.join(", ")}`,
-      );
-    }
-  }
-
-  get nodeEnv() {
-    return process.env.NODE_ENV || "development";
-  }
-
-  get port() {
-    return parseInt(process.env.PORT, 10) || 3001;
+class Config extends BaseConfig {
+  getRequiredEnvVars() {
+    return ["PORT", "MONGODB_URI", "JWT_SECRET", "JWT_REFRESH_SECRET"];
   }
 
   get mongoUri() {
@@ -36,18 +11,6 @@ class Config {
 
   get redisUrl() {
     return process.env.REDIS_URL;
-  }
-
-  get logLevel() {
-    return process.env.LOG_LEVEL || "info";
-  }
-
-  get isDevelopment() {
-    return this.nodeEnv === "development";
-  }
-
-  get isProduction() {
-    return this.nodeEnv === "production";
   }
 
   // JWT Configuration
@@ -65,11 +28,10 @@ class Config {
     return {
       bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 12,
       maxLoginAttempts: parseInt(process.env.MAX_LOGIN_ATTEMPTS, 10) || 5,
-      lockoutTime: parseInt(process.env.LOCKOUT_TIME, 10) || 900000, // 15 minutes
+      lockoutTime: parseInt(process.env.LOCKOUT_TIME, 10) || 900000,
     };
   }
 
-  // RBAC Roles (can be moved to database later)
   get roles() {
     return {
       SUPER_ADMIN: "super_admin",
@@ -80,10 +42,9 @@ class Config {
     };
   }
 
-  // Permissions mapping
   get permissions() {
     return {
-      super_admin: ["*"], // All permissions
+      super_admin: ["*"],
       admin: [
         "users:read",
         "users:write",
