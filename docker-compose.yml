@@ -51,6 +51,8 @@ services:
       - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672
       - AUTH_SERVICE_URL=http://auth-service:3001
       - CATALOG_SERVICE_URL=http://catalog-service:3002
+      - INVENTORY_SERVICE_URL=http://inventory-service:3003
+      - CART_SERVICE_URL=http://cart-service:3004
     depends_on:
       - redis
       - rabbitmq
@@ -85,6 +87,40 @@ services:
       - PORT=3002
       - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/catalog?authSource=admin
       - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - ecommerce-network
+
+  inventory-service:
+    build: ./services/inventory-service
+    container_name: ecommerce-inventory
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/inventory?authSource=admin
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - ecommerce-network
+
+  cart-service:
+    build: ./services/cart-service
+    container_name: ecommerce-cart
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=production
+      - PORT=3004
+      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/cart?authSource=admin
+      - REDIS_URL=redis://redis:6379
+      - CATALOG_SERVICE_URL=http://catalog-service:3002
+      - INVENTORY_SERVICE_URL=http://inventory-service:3003
     depends_on:
       - mongodb
       - redis
