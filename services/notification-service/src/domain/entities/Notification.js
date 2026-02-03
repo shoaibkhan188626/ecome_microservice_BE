@@ -162,7 +162,52 @@ notificationSchema.statics.findForRetry = function () {
   }).sort({ createdAt: 1 });
 };
 
-
 /**
  * Instance: Mark as sent
  */
+
+notificationSchema.methods.markAsSent = async function (
+  providerId = null,
+  providerResponse = null,
+) {
+  this.status = "sent";
+  this.sentAt = new Date();
+  this.providerId = providerId;
+  this.providerResponse = providerResponse;
+  await this.save();
+};
+
+/**
+ * Instance : MArk as delivered
+ */
+
+notificationSchema.methods.markAsDelivered = async function () {
+  this.status = "delivered";
+  this.deliveredAt = new Date();
+  await this.save();
+};
+
+/**
+ * Instance : Mark as failed
+ */
+
+notificationSchema.methods.markAsFailed = async function (errorMessage) {
+  this.status = "failed";
+  this.failedAt = new Date();
+  this.errorMessage = errorMessage;
+  await this.save();
+};
+
+/**
+ * Instance : increment retry
+ */
+
+notificationSchema.methods.incrementRetry = async function () {
+  this.retryCount += 1;
+  this.lastRetryAt = new Date();
+  this.status = this.retryCount >= this.maxRetries ? "failed" : "retrying";
+  await this.save();
+};
+
+const Notification = mongoose.model("Notification", notificationSchema);
+export default Notification;
