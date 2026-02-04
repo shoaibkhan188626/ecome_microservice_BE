@@ -28,11 +28,19 @@ class Config extends BaseConfig {
     };
   }
 
+  // SMS Configuration (Fonoster)
   get sms() {
     return {
-      accountSid: process.env.TWILIO_ACCOUNT_SID,
-      authToken: process.env.TWILIO_AUTH_TOKEN,
-      phoneNumber: process.env.TWILIO_PHONE_NUMBER,
+      fonosterUrl:
+        process.env.FONOSTER_API_URL || "https://api.fonoster.io/v1beta1",
+      apiKey: process.env.FONOSTER_API_KEY,
+      apiSecret: process.env.FONOSTER_API_SECRET,
+      senderId: process.env.FONOSTER_SENDER_ID, // Your Fonoster number
+      // Advanced settings
+      maxRetries: parseInt(process.env.SMS_MAX_RETRIES, 10) || 3,
+      retryDelay: parseInt(process.env.SMS_RETRY_DELAY, 10) || 1000,
+      batchSize: parseInt(process.env.SMS_BATCH_SIZE, 10) || 50,
+      rateLimitDelay: parseInt(process.env.SMS_RATE_LIMIT_DELAY, 10) || 200,
     };
   }
 
