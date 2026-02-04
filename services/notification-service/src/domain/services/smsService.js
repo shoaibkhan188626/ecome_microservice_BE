@@ -1,6 +1,6 @@
 import { createLogger } from "@ecommerce/common";
 import config from "../../config/index.js";
-
+import axios from "axios";
 const logger = createLogger(
   "notification-service",
   config.logLevel,
@@ -145,16 +145,15 @@ class FonosterSMSService {
       this.recordFailure();
       logger.error("Send SMS error:", error);
 
-      //retry logic
-      if (options.retry !== false && options.retryCount < 3) {
-        logger.info(
-          `Retrying SMS send (attempt ${options.retryCount + 1}/3)...`,
-        );
-        await this.rateLimitDelay(1000 * Math.pow(2, options.retryCount)); //exponential backoff
+      // Retry logic with exponential backoff
+      const retryCount = options.retryCount ?? 0;
+      if (options.retry !== false && retryCount < 3) {
+        logger.info(`Retrying SMS send (attempt ${retryCount + 1}/3)...`);
+        await this.delay(1000 * Math.pow(2, retryCount));
 
         return this.sendSMS(to, message, {
           ...options,
-          retryCount: (options.retryCount || 0) + 1,
+          retryCount: retryCount + 1,
         });
       }
       throw error;
@@ -243,7 +242,7 @@ class FonosterSMSService {
    * Send order notification SMS
    */
 
-  async sendOrderNotification(to, orderNumber, status, tackingUrl = null) {
+  async sendOrderNotification(to, orderNumber, status, trackingUrl = null) {
     const templates = {
       confirmed: `✅ Order ${orderNumber} confirmed!\n\nWe'll notify you when it ships.`,
 
@@ -297,7 +296,7 @@ class FonosterSMSService {
       //process batch concurrently
       const batchPromises = batch.map(async (recipient, index) => {
         try {
-          //Stagger request within batch to void rate limiting
+          // Stagger requests within batch to avoid rate limiting
           await this.delay(index * this.rateLimitDelay);
 
           const result = await this.sendSMS(
@@ -309,7 +308,7 @@ class FonosterSMSService {
             },
           );
 
-          result.success.push({
+          results.success.push({
             phone: recipient.phone,
             ref: result.ref,
             status: result.status,
@@ -388,14 +387,14 @@ class FonosterSMSService {
    */
 
   sanitizedMessage(message) {
-    let sanitized = message
+    let sanitized = String(message)
       .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Control characters
       .trim();
 
     const maxLength = 480;
 
     if (sanitized.length > maxLength) {
-      ((sanitized = sanitized), substring(0, maxLength - 3) + "...");
+      sanitized = sanitized.substring(0, maxLength - 3) + "...";
       logger.warn(`Message truncated to ${maxLength} characters`);
     }
     return sanitized;
@@ -505,11 +504,10 @@ class FonosterSMSService {
     logger.info("Internal SMS queue processing complete");
   }
 
-  /**graceful shutdown */
+  /** Graceful shutdown */
   async shutdown() {
-    logger.info("Shutting down fonoster SMS service...");
+    logger.info("Shutting down Fonoster SMS service...");
 
-    //process remaining queued messages
     if (this.messageQueue.length > 0) {
       logger.info(`Waiting for ${this.messageQueue.length} messages to finish`);
       await this.processQueue();

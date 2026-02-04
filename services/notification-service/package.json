@@ -19,7 +19,10 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@ecommerce/common": "workspace:*",
     "@fonoster/sdk": "^0.17.1",
+    "axios": "^1.13.4",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

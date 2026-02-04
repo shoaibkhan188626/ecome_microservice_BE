@@ -22,23 +22,23 @@ class NotificationConsumer {
     try {
       await this.rabbitmq.connect(config.rabbitmqUrl);
 
-      //1 listen for user events (welcome, reset password)
+      // 1. Listen for user events (welcome, reset password)
       await this.rabbitmq.consumeMessages(
-        "notification.user,queue",
+        "notification.user.queue",
         "user.events",
         "user.#",
         this.handleUserEvents.bind(this),
       );
 
-      //2 listens for order events (confirmed, shipped,cancelled)
+      // 2. Listen for order events (confirmed, shipped, cancelled)
       await this.rabbitmq.consumeMessages(
         "notification.order.queue",
         "order.events",
         "order.#",
-        this.handleUserEvents.bind(this),
+        this.handleOrderEvents.bind(this),
       );
 
-      //3 listen for inventory events (Low Stock)
+      // 3. Listen for inventory events (Low Stock)
       await this.rabbitmq.consumeMessages(
         "notification.inventory.queue",
         "inventory.events",
@@ -123,18 +123,39 @@ class NotificationConsumer {
         break;
 
       case "order.shipped":
-        //send sms via fonoster
-        await notificationService.sendEmailNotification({
-          userId: order.userId,
-          recipient,
-          type: "order_shipped",
-          channel: "sms",
-          message: `Order ${order.orderNumber} has shipped! tracking:${order.trackingNumber}`,
-          metadata: {
-            orderNumber: order.orderNumber,
-            trackingNumber: order.trackingNumber,
-          },
-        });
+        // Send SMS + Email for shipping notification
+        const trackingUrl = `https://ecommerce.com/orders/${order.orderNumber}/track`;
+        if (recipient.phone) {
+          await notificationService.sendNotification({
+            userId: order.userId,
+            recipient,
+            type: "order_shipped",
+            channel: "sms",
+            message: `Order ${order.orderNumber} has shipped! Track: ${trackingUrl}`,
+            metadata: {
+              orderNumber: order.orderNumber,
+              trackingNumber: order.trackingNumber,
+              trackingUrl,
+            },
+          });
+        }
+        if (recipient.email) {
+          await notificationService.sendNotification({
+            userId: order.userId,
+            recipient,
+            type: "order_shipped",
+            channel: "email",
+            templateName: "orderShipped",
+            metadata: {
+              customerName: order.shippingAddress?.fullName || "Customer",
+              orderNumber: order.orderNumber,
+              trackingNumber: order.trackingNumber,
+              trackingUrl,
+              carrier: order.carrier,
+              estimatedDelivery: order.estimatedDelivery,
+            },
+          });
+        }
         break;
     }
   }
@@ -146,13 +167,15 @@ class NotificationConsumer {
     const { sku, currentQuantity, threshold } = data;
     logger.warn(`LOW STOCK ALERT: ${sku} is at ${currentQuantity}`);
 
-    //notify admin (custom logic)
+    const adminEmail = process.env.ADMIN_EMAIL || "admin@ecommerce.com";
+
     await notificationService.sendNotification({
       type: "low_stock_alert",
       channel: "email",
-      recipient: { email: "admin@commerce.com" },
+      recipient: { email: adminEmail },
       subject: `Low Stock Alert: ${sku}`,
-      message: ` Product ${sku} is running low current stock :${currentQuantity}. Threshold:${threshold}`,
+      message: `Product ${sku} is running low. Current stock: ${currentQuantity}. Threshold: ${threshold}`,
+      metadata: { sku, currentQuantity, threshold },
     });
   }
 

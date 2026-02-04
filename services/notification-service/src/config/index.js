@@ -5,6 +5,10 @@ class Config extends BaseConfig {
     return ["PORT", "MONGODB_URI", "RABBITMQ_URL"];
   }
 
+  get port() {
+    return parseInt(process.env.PORT, 10) || 3006;
+  }
+
   get mongoUri() {
     return process.env.MONGODB_URI;
   }
@@ -54,6 +58,19 @@ class Config extends BaseConfig {
     return {
       maxRetryAttempts: parseInt(process.env.MAX_RETRY_ATTEMPTS, 10) || 3,
       retryDelay: parseInt(process.env.RETRY_DELAY_MS, 10) || 5000,
+    };
+  }
+
+  get jwtSecret() {
+    return process.env.JWT_SECRET;
+  }
+
+  get roles() {
+    return {
+      ADMIN: "admin",
+      SUPER_ADMIN: "super_admin",
+      CUSTOMER: "customer",
+      VENDOR: "vendor",
     };
   }
 }

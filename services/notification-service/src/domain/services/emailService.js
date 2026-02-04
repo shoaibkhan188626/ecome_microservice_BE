@@ -50,7 +50,7 @@ class EmailService {
    * @returns {Promise<Object>}
    */
 
-  async sendTemplateEmail(to, templateName, data) {
+  async sendTemplateEmail(to, templateName, data = {}) {
     try {
       const template = emailTemplates[templateName];
 
@@ -60,9 +60,10 @@ class EmailService {
 
       const { subject, html, text } = template(data);
 
-      return await this.sendTemplateEmail(to, subject, html, text);
+      return await this.sendEmail(to, subject, html, text);
     } catch (error) {
       logger.error("Send template email error:", error);
+      throw error;
     }
   }
 

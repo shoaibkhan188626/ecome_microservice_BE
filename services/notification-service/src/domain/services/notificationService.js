@@ -39,6 +39,7 @@ class NotificationService {
         priority: priority || "normal",
         scheduledFor,
         status: "pending",
+        maxRetries: config.notification.maxRetryAttempts,
         expiresAt: DateHelper.addDays(new Date(), 30),
       });
 
@@ -172,9 +173,32 @@ class NotificationService {
     }
   }
 
+  async markAsRead(notificationId, userId) {
+    try {
+      const notification = await Notification.findOne({
+        _id: notificationId,
+        userId,
+      });
+
+      if (!notification) {
+        throw new Error("Notification not found");
+      }
+
+      notification.readAt = new Date();
+      await notification.save();
+
+      return notification;
+    } catch (error) {
+      logger.error("Mark as read error:", error);
+      throw error;
+    }
+  }
+
   async retryFailedNotifications() {
     try {
-      const failedNotifications = await Notification.findForRetry();
+      const failedNotifications = await Notification.findForRetry(
+        config.notification.maxRetryAttempts
+      );
       logger.info(
         `Retrying ${failedNotifications.length} failed notifications`,
       );

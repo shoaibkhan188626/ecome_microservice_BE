@@ -1,66 +1,50 @@
+import axios from "axios";
+
 /**
- * HTTP Client for inter-service communication
+ * High-Performance HTTP Client using Axios
  */
 export class HTTPClient {
   constructor(baseURL, timeout = 30000) {
-    this.baseURL = baseURL;
-    this.timeout = timeout;
-  }
-
-  async request(method, path, data = null, headers = {}) {
-    const url = `${this.baseURL}${path}`;
-
-    const options = {
-      method,
+    this.client = axios.create({
+      baseURL,
+      timeout,
       headers: {
         "Content-Type": "application/json",
-        ...headers,
       },
-    };
+    });
 
-    if (data) {
-      options.body = JSON.stringify(data);
-    }
+    // Request Interceptor (e.g., for logging or adding Auth headers)
+    this.client.interceptors.request.use(
+      (config) => config,
+      (error) => Promise.reject(error),
+    );
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(responseData.error?.message || "Request failed");
-      }
-
-      return responseData;
-    } catch (error) {
-      if (error.name === "AbortError") {
-        throw new Error("Request timeout");
-      }
-      throw error;
-    }
+    // Response Interceptor (Unifies error format)
+    this.client.interceptors.response.use(
+      (response) => response.data,
+      (error) => {
+        const message =
+          error.response?.data?.error?.message ||
+          error.message ||
+          "Internal Service Call Failed";
+        return Promise.reject(new Error(message));
+      },
+    );
   }
 
   async get(path, headers = {}) {
-    return this.request("GET", path, null, headers);
+    return this.client.get(path, { headers });
   }
 
   async post(path, data, headers = {}) {
-    return this.request("POST", path, data, headers);
+    return this.client.post(path, data, { headers });
   }
 
   async put(path, data, headers = {}) {
-    return this.request("PUT", path, data, headers);
+    return this.client.put(path, data, { headers });
   }
 
   async delete(path, headers = {}) {
-    return this.request("DELETE", path, null, headers);
+    return this.client.delete(path, { headers });
   }
 }

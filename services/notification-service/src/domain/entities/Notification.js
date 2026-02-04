@@ -97,6 +97,13 @@ const notificationSchema = new mongoose.Schema(
     failedAt: Date,
     errorMessage: String,
 
+    // In-app read status
+    readAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
     //provider info
     provider: String,
     providerId: String,
@@ -154,11 +161,12 @@ notificationSchema.statics.findByUser = function (userId, options = {}) {
 
 /**
  * Statics : Get failed notifications for retry
+ * Uses $expr to compare retryCount with maxRetries per document
  */
-notificationSchema.statics.findForRetry = function () {
+notificationSchema.statics.findForRetry = function (maxRetriesDefault = 3) {
   return this.find({
-    status: "failed",
-    retryCount: { $lt: this.maxRetries },
+    status: { $in: ["failed", "retrying"] },
+    $expr: { $lt: ["$retryCount", { $ifNull: ["$maxRetries", maxRetriesDefault] }] },
   }).sort({ createdAt: 1 });
 };
 
