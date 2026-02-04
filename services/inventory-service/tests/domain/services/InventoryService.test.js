@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../entities/Inventory.js", () => ({
+vi.mock("../../../src/domain/entities/Inventory.js", () => ({
   default: {
     findOne: vi.fn(),
     findBySKU: vi.fn(),
@@ -9,15 +9,19 @@ vi.mock("../entities/Inventory.js", () => ({
   },
 }));
 
-vi.mock("../entities/StockMovement.js", () => ({
+vi.mock("../../../src/domain/entities/StockMovement.js", () => ({
   default: { recordMovement: vi.fn() },
 }));
 
-vi.mock("@ecommerce/common", () => ({
-  createLogger: () => ({ info: vi.fn(), error: vi.fn() }),
-}));
+vi.mock("@ecommerce/common", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createLogger: () => ({ info: vi.fn(), error: vi.fn() }),
+  };
+});
 
-vi.mock("../../config/index.js", () => ({
+vi.mock("../../../src/config/index.js", () => ({
   default: {
     logLevel: "info",
     isProduction: false,
@@ -25,7 +29,7 @@ vi.mock("../../config/index.js", () => ({
   },
 }));
 
-const Inventory = (await import("../entities/Inventory.js")).default;
+const Inventory = (await import("../../../src/domain/entities/Inventory.js")).default;
 
 describe("InventoryService", () => {
   let inventoryService;
@@ -38,7 +42,7 @@ describe("InventoryService", () => {
       withLock: vi.fn((key, fn) => fn()),
     };
     mockRedis = {};
-    const { default: InventoryService } = await import("./InventoryService.js");
+    const { default: InventoryService } = await import("../../../src/domain/services/InventoryService.js");
     inventoryService = new InventoryService(mockLockManager, mockRedis);
   });
 

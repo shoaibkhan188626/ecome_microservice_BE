@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PaginationHelper } from "./pagination.js";
+import { PaginationHelper } from "../../src/helpers/pagination.js";
 
 describe("PaginationHelper", () => {
   describe("getPaginationParams", () => {

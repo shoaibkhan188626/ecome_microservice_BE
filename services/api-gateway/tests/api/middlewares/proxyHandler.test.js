@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 vi.mock("http-proxy-middleware", () => ({
   createProxyMiddleware: vi.fn(() => vi.fn()),
 }));
 
-vi.mock("../../config/index.js", () => ({
+vi.mock("../../../../src/config/index.js", () => ({
   default: {
     logLevel: "info",
     isProduction: false,
@@ -16,11 +16,15 @@ vi.mock("../../config/index.js", () => ({
   },
 }));
 
-vi.mock("@ecommerce/common", () => ({
-  createLogger: () => ({ info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
-}));
+vi.mock("@ecommerce/common", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createLogger: () => ({ info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+  };
+});
 
-const { default: proxyHandler } = await import("./proxyHandler.js");
+const { default: proxyHandler } = await import("../../../src/api/middlewares/proxyHandler.js");
 
 describe("ProxyHandler", () => {
   describe("getRoutes", () => {

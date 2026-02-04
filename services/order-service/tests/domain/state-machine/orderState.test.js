@@ -5,7 +5,7 @@ import {
   canTransition,
   getNextState,
   isTerminalState,
-} from "./orderState.js";
+} from "../../../src/domain/state-machine/orderState.js";
 
 describe("Order State Machine", () => {
   describe("canTransition", () => {

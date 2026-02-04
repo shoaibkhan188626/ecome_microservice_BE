@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { generateSlug, generateUniqueSlug } from "./slugify.js";
+import { generateSlug, generateUniqueSlug } from "../../src/helpers/slugify.js";
 
 describe("generateSlug", () => {
   it("should convert text to lowercase slug", () => {

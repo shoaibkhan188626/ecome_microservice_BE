@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ResponseHandler } from "./responseHandler.js";
+import { ResponseHandler } from "../../src/utils/responseHandler.js";
 
 describe("ResponseHandler", () => {
   let mockRes;

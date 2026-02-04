@@ -1,28 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../entities/Cart.js", () => ({
+vi.mock("../../../../src/domain/entities/Cart.js", () => ({
   default: {
     findByUser: vi.fn(),
     findOne: vi.fn(),
   },
 }));
 
-vi.mock("@ecommerce/common", () => ({
-  createLogger: () => ({ info: vi.fn(), error: vi.fn() }),
-  HTTPClient: vi.fn().mockImplementation(() => ({
-    get: vi.fn().mockResolvedValue({}),
-    post: vi.fn().mockResolvedValue({}),
-  })),
-  DateHelper: {
-    addDays: (d, days) => {
-      const result = new Date(d);
-      result.setDate(result.getDate() + days);
-      return result;
+vi.mock("@ecommerce/common", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createLogger: () => ({ info: vi.fn(), error: vi.fn() }),
+    HTTPClient: vi.fn().mockImplementation(() => ({
+      get: vi.fn().mockResolvedValue({}),
+      post: vi.fn().mockResolvedValue({}),
+    })),
+    DateHelper: {
+      addDays: (d, days) => {
+        const result = new Date(d);
+        result.setDate(result.getDate() + days);
+        return result;
+      },
     },
-  },
-}));
+  };
+});
 
-vi.mock("../../config/index.js", () => ({
+vi.mock("../../../../src/config/index.js", () => ({
   default: {
     logLevel: "info",
     isProduction: false,
@@ -34,7 +38,7 @@ vi.mock("../../config/index.js", () => ({
   },
 }));
 
-const Cart = (await import("../entities/Cart.js")).default;
+const Cart = (await import("../../../src/domain/entities/Cart.js")).default;
 
 describe("CartService", () => {
   let cartService;
@@ -46,7 +50,7 @@ describe("CartService", () => {
       get: vi.fn(),
       set: vi.fn(),
     };
-    const { default: CartService } = await import("./cartService.js");
+    const { default: CartService } = await import("../../../src/domain/services/cartService.js");
     cartService = new CartService(mockRedis);
   });
 

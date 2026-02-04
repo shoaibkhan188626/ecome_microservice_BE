@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../domain/services/authService.js", () => ({
+vi.mock("../../../src/domain/services/authService.js", () => ({
   default: {
     register: vi.fn(),
     login: vi.fn(),
@@ -21,8 +21,8 @@ vi.mock("@ecommerce/common", async (importOriginal) => {
   };
 });
 
-const { default: authController } = await import("./authController.js");
-const authService = (await import("../../domain/services/authService.js")).default;
+const { default: authController } = await import("../../../src/api/controllers/authController.js");
+const authService = (await import("../../../src/domain/services/authService.js")).default;
 const { ResponseHandler } = await import("@ecommerce/common");
 
 describe("AuthController", () => {

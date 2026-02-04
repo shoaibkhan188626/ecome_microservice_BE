@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DateHelper } from "./dateHelper.js";
+import { DateHelper } from "../../src/utils/dateHelper.js";
 
 describe("DateHelper", () => {
   describe("addDays", () => {
@@ -9,7 +9,6 @@ describe("DateHelper", () => {
       expect(result.getDate()).toBe(20);
       expect(result.getMonth()).toBe(0);
     });
-
     it("should handle month overflow", () => {
       const date = new Date("2024-01-30");
       const result = DateHelper.addDays(date, 5);
@@ -40,7 +39,6 @@ describe("DateHelper", () => {
       const past = new Date(Date.now() - 86400000);
       expect(DateHelper.isExpired(past)).toBe(true);
     });
-
     it("should return false for future date", () => {
       const future = new Date(Date.now() + 86400000);
       expect(DateHelper.isExpired(future)).toBe(false);
@@ -80,7 +78,6 @@ describe("DateHelper", () => {
       const d2 = new Date("2024-01-11");
       expect(DateHelper.daysBetween(d1, d2)).toBe(10);
     });
-
     it("should return absolute value regardless of order", () => {
       const d1 = new Date("2024-01-15");
       const d2 = new Date("2024-01-10");

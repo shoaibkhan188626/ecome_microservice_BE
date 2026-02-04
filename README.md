@@ -1,154 +1,89 @@
-# Role
-Act as a Senior Staff Engineer and Software Architect with expertise in Node.js Microservices, Event-Driven Architecture, and Enterprise Design Patterns.
+# eCom_BE — Production-Grade E‑Commerce Microservices (Monorepo)
 
-# Task
-Analyze the current repository structure and code quality. Provide a detailed technical audit without modifying any files.
+eCom_BE is a modular backend for e‑commerce built as independent Node.js microservices in a single repository. It is designed for scalability, resiliency, and developer productivity with clear boundaries between domains, shared tooling, and Docker‑based orchestration.
 
-# Context
-- Architecture: Node.js Microservices (Monorepo)
-- Shared Library: packages/common (Shared via NPM Workspaces)
-- Goal: Scalability, high availability, and "Big Tech" industry standards.
+## Features
+- Microservices for Auth, Catalog, Inventory, Cart, Orders, Notifications
+- API Gateway as a single entrypoint with routing and cross‑cutting concerns
+- Asynchronous messaging via RabbitMQ
+- MongoDB for persistence, Redis for caching/sessions
+- Shared common package for utilities, errors, helpers, and base configs
+- Standardized testing with Vitest in each service
+- Docker Compose for local development
 
-# Evaluation Criteria
-Please provide your feedback in a .md format focusing on:
+## Architecture
+- High‑level architecture explained in [ARCHITECTURE.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/ARCHITECTURE.md)
+- Communication patterns:
+  - HTTP via API Gateway for synchronous calls
+  - RabbitMQ for event‑driven, asynchronous flows
+- Per‑service databases for loose coupling
 
-1. **System Design & Architecture**
-   - Assess the coupling between services.
-   - Evaluate the current Request-Response (HTTP) vs. Event-Driven patterns.
-   - Review the API Gateway implementation.
+## Repository Structure
+- services/api-gateway — gateway and proxy middleware
+- services/auth-service — authentication, tokens, profiles
+- services/catalog-service — products, categories, search
+- services/inventory-service — stock and availability
+- services/cart-service — cart operations and totals
+- services/order-service — order lifecycle, events
+- services/notification-service — email/SMS/push notifications
+- packages/common — shared utilities and base config
+- docs/ — development, testing, configuration, events, security
 
-2. **SOLID & DRY Principles**
-   - Is packages/common being used effectively to prevent code duplication?
-   - Are the services following the Single Responsibility Principle?
-   - Identify "Leaky Abstractions" where service-specific logic might be bleeding into the common package.
+## Quick Start
+### With Docker Compose
+1. Install and start Docker
+2. From repo root: `docker compose up --build -d`
+3. Services:
+   - API Gateway: http://localhost:3000
+   - Auth: http://localhost:3001
+   - Catalog: http://localhost:3002
+   - Inventory: http://localhost:3003
+   - Cart: http://localhost:3004
+   - Order: http://localhost:3005
+   - Notification: http://localhost:3006
+4. Infrastructure:
+   - MongoDB: 27017
+   - Redis: 6379
+   - RabbitMQ: 5672 (AMQP), 15672 (management UI)
 
-3. **Code Quality & Pattern Audit**
-   - Look for State Machine implementation (specifically in Order Service).
-   - Evaluate Idempotency handling for critical operations.
-   - Audit Error Handling and Logging consistency across services.
+### Without Docker
+- From each service directory:
+  - `npm install`
+  - Set required env vars (see service README or docker-compose.yml)
+  - `npm run test` then `npm start`
 
-4. **Pros and Cons of the Current System**
-   - List the strengths (what is done well).
-   - List the "Technical Debt" or risks currently present.
+## Configuration
+- Services extend BaseConfig from `@ecommerce/common`
+- Environment variables are set in [docker-compose.yml](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/docker-compose.yml)
+- Detailed guidance in [docs/CONFIG.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/docs/CONFIG.md)
 
-5. **Roadmap to "Big Tech" Standard**
-   - Specific suggestions for: TypeScript migration, Event Bus (RabbitMQ/Kafka) integration, and Observability (Distributed Tracing).
+## Development
+- Workflow and conventions in [docs/DEVELOPMENT.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/docs/DEVELOPMENT.md)
+- Code lives under `src/**` per service; tests in `tests/**`
+- Prefer importing shared logic from `@ecommerce/common`
 
-# Output Format
-Provide the response as a structured Markdown report. Do not suggest code changes that require immediate rewriting; focus on architectural feedback and structural improvements.
+## Testing
+- Runner: Vitest per service and common package
+- Tests in `tests/**/*.test.js`
+- Usage and patterns in [docs/TESTING.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/docs/TESTING.md)
 
----
+## Events & Messaging
+- Event conventions and payload examples in [docs/EVENTS.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/docs/EVENTS.md)
+- Use RabbitMQ management UI at http://localhost:15672 (admin/admin123 by default)
 
-## Technical Audit: eCom_BE Microservices
+## Security
+- JWT for auth; do not commit secrets
+- Rate limiting and validation recommended at gateway/services
+- Details in [docs/SECURITY.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/docs/SECURITY.md)
 
-### 1. System Design & Architecture
+## Service READMEs
+- API Gateway: [services/api-gateway/README.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/services/api-gateway/README.md)
+- Auth: [services/auth-service/README.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/services/auth-service/README.md)
+- Catalog: [services/catalog-service/README.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/services/catalog-service/README.md)
+- Inventory: [services/inventory-service/README.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/services/inventory-service/README.md)
+- Cart: [services/cart-service/README.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/services/cart-service/README.md)
+- Order: [services/order-service/README.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/services/order-service/README.md)
+- Notification: [services/notification-service/README.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/services/notification-service/README.md)
 
-**Coupling between services:**
-The current directory structure suggests a clear separation of concerns with distinct service directories (services/api-gateway, services/auth-service, etc.). This is a good starting point for microservices, aiming to reduce direct coupling. However, without inspecting the code within each service, it's difficult to definitively assess runtime coupling. Potential areas for tight coupling might arise from:
-*   **Direct HTTP/RPC calls:** If services frequently make synchronous calls to each other, this can introduce temporal coupling and reduce resilience.
-*   **Shared database schemas:** While not immediately visible, if services share the same database and modify each other's data directly, it's a strong form of coupling.
-*   **packages/common over-reliance:** If too much business logic or specific service contracts reside in packages/common, it can create an unintended coupling point, requiring multiple services to redeploy if the common package changes.
-
-**Request-Response (HTTP) vs. Event-Driven patterns:**
-The presence of an pi-gateway suggests a primary Request-Response pattern for external communication. The directory structure also shows events in order-service and messaging in pi-gateway, catalog-service, and inventory-service, 
-otification-service. This indicates an intention towards event-driven patterns, which is excellent for decoupling and scalability in a microservices architecture.
-*   **Recommendation:** Ensure event-driven patterns are used for inter-service communication where eventual consistency is acceptable, reserving direct HTTP/RPC for queries or commands requiring immediate consistency. Evaluate if a dedicated Event Bus (e.g., RabbitMQ, Kafka) is already in place or planned for robust event handling.
-
-**API Gateway implementation:**
-The pi-gateway service is a critical component for managing external traffic, authentication, routing, and potentially request aggregation/transformation.
-*   **Review Points:**
-    *   **Authentication/Authorization:** Is the gateway handling authentication and passing user context downstream securely and efficiently?
-    *   **Rate Limiting/Throttling:** Are mechanisms in place to protect backend services from abuse?
-    *   **Error Handling/Fallback:** How does the gateway handle upstream service failures?
-    *   **Routing:** Is routing dynamic and configurable?
-    *   **Observability:** Does it provide metrics, logs, and tracing for requests flowing through it?
-
-### 2. SOLID & DRY Principles
-
-**packages/common effectiveness for preventing code duplication:**
-The existence of packages/common is a strong indicator of an attempt to adhere to DRY (Don't Repeat Yourself) principles by sharing common utilities, middleware, or entities.
-*   **Strengths:** Good for shared helpers (syncHandler.js, cacheHelper.js, pagination.js, slugify.js, jwtHelper.js, passwordHelper.js, esponseHandler.js), error classes (AppError.js), and potentially base configurations.
-*   **Concerns:** Needs careful auditing to ensure it only contains truly common, generic code and does not become a dumping ground for service-specific logic, which would violate SRP and create "Leaky Abstractions."
-
-**Services following the Single Responsibility Principle (SRP):**
-The distinct service names (uth-service, cart-service, catalog-service, inventory-service, 
-otification-service, order-service) inherently suggest adherence to SRP at a high level. Each service appears to manage a specific business domain.
-*   **Verification:** An in-depth code review within each service's domain and pi/controllers directories would confirm if individual modules/classes within those services also adhere to SRP.
-
-**"Leaky Abstractions" where service-specific logic might be bleeding into the common package:**
-This is a critical area for monorepos with shared packages.
-*   **Potential risk areas in packages/common:**
-    *   infrastructure directory: cache, database, messaging, payment subdirectories. While common interfaces/clients for these might be here, specific configurations or domain-specific interactions (e.g., a payment helper that knows too much about the order-service's payment flow) would be a leaky abstraction.
-    *   alidators/commonValidators.js: Should contain truly generic validations (e.g., email format, UUID) but not validations specific to a particular entity (e.g., product quantity constraints specific to catalog-service).
-
-### 3. Code Quality & Pattern Audit
-
-**State Machine implementation (specifically in Order Service):**
-Order processing is a classic use case for state machines (e.g., Pending -> Confirmed -> Shipped -> Delivered -> Cancelled). The presence of an events directory in order-service hints at an event-driven approach, which often complements state machines.
-*   **Recommendation:** Verify if a formal state machine library or pattern (e.g., using xstate, or a custom implementation) is used to manage order lifecycle transitions, ensuring all possible states and transitions are clearly defined and handled robustly. This is crucial for preventing inconsistent order states.
-
-**Idempotency handling for critical operations:**
-In a distributed, event-driven system, messages or requests can be redelivered. Critical operations (e.g., charging a customer, updating inventory) must be idempotent to prevent duplicate processing and inconsistent data.
-*   **Review Points:**
-    *   **Payment processing:** Are payment requests uniquely identified and processed only once?
-    *   **Inventory updates:** Are adjustments applied idempotently?
-    *   **Event consumers:** Are event handlers designed to process duplicate events without side effects?
-*   **Common patterns:** Using unique request IDs/transaction IDs, checking for existing records before creation, or employing compare-and-swap operations.
-
-**Error Handling and Logging consistency across services:**
-*   **packages/common/src/errors/AppError.js and middlewares/errorHandler.js:** These are excellent starting points for consistent error handling by providing a centralized error class and a global error middleware.
-*   **Logging (logger.js in common, logs directories in services):** Suggests logging is considered.
-*   **Review Points:**
-    *   **Consistent error response format:** Do all services return errors in a standardized format (e.g., HTTP status code, error code, message)?
-    *   **Centralized logging:** Are logs aggregated to a central system (e.g., ELK stack, Splunk, DataDog) for easy monitoring and debugging?
-    *   **Contextual logging:** Do logs include sufficient context (e.g., request ID from equestId.js, user ID, service name, correlation IDs for distributed tracing)?
-    *   **Error classification:** Are errors properly classified (e.g., operational vs. programming errors, transient vs. permanent) to inform appropriate recovery strategies?
-
-### 4. Pros and Cons of the Current System
-
-**Strengths (What is done well):**
-*   **Microservices Architecture:** Clear separation into distinct services promotes scalability, independent deployment, and team autonomy.
-*   **Monorepo with Shared Package (packages/common):** Facilitates code sharing and consistency while managing multiple services in one repository.
-*   **Intent for Event-Driven Patterns:** Indicated by events and messaging directories, which is key for a resilient and scalable distributed system.
-*   **Centralized Error Handling:** AppError.js and errorHandler.js in packages/common provide a foundation for consistent error management.
-*   **Logging Infrastructure:** Explicit logs directories and logger.js show awareness of operational visibility.
-*   **Docker-Compose:** docker-compose.yml indicates an environment for local development and orchestration, simplifying setup.
-
-**"Technical Debt" or Risks Currently Present:**
-*   **JavaScript (lack of TypeScript):** Without static typing, refactoring is riskier, and many common errors are only caught at runtime, increasing development time and bug potential.
-*   **Unclear Event Bus:** While event-driven patterns are intended, the specific technology and implementation for the Event Bus (e.g., RabbitMQ, Kafka) are not immediately apparent from the structure. This could lead to custom, less robust messaging solutions.
-*   **Potential for packages/common Bloat/Leaky Abstractions:** The shared package, if not strictly governed, can become a source of tight coupling and obscure dependencies between services.
-*   **Idempotency Implementation:** The presence of critical operations (e.g., payments, inventory) without explicit indicators of idempotent handling introduces a risk of data inconsistencies on retry.
-*   **Observability Maturity:** While logging exists, a full "Big Tech" standard requires comprehensive distributed tracing, advanced metrics, and sophisticated alerting, which are not explicitly visible.
-*   **Database Coupling:** The current structure doesn't reveal database strategies. If services share databases or tables, it's a significant coupling risk.
-
-### 5. Roadmap to "Big Tech" Standard
-
-**1. TypeScript Migration:**
-*   **Strategy:** Implement a phased migration. Start with new features/services in TypeScript. Gradually migrate existing services, focusing on critical paths first. Use tools like 	s-migrate for initial automation, followed by manual type annotation and refactoring.
-*   **Benefits:** Improved code quality, better maintainability, fewer runtime errors, enhanced developer experience, and better tooling support.
-
-**2. Event Bus (RabbitMQ/Kafka) Integration:**
-*   **Strategy:** Introduce a robust, enterprise-grade Event Bus (e.g., Apache Kafka or RabbitMQ) for all inter-service asynchronous communication.
-    *   **Kafka:** Ideal for high-throughput, fault-tolerant event streaming and long-term event storage (event sourcing).
-    *   **RabbitMQ:** Excellent for reliable message queuing and routing.
-*   **Steps:**
-    *   Define clear event contracts (schemas).
-    *   Implement producers and consumers for each service, ensuring reliable message delivery and processing.
-    *   Integrate dead-letter queues and retry mechanisms.
-
-**3. Observability (Distributed Tracing):**
-*   **Strategy:** Implement a comprehensive observability stack to gain deep insights into the system's behavior.
-*   **Key Components:**
-    *   **Distributed Tracing:** Integrate OpenTelemetry or similar standards across all services to trace requests end-to-end. This helps pinpoint latency issues and errors across service boundaries.
-    *   **Enhanced Metrics:** Collect granular metrics (e.g., request rates, error rates, latency, resource utilization) using Prometheus or similar, exposed via a standard endpoint in each service.
-    *   **Centralized Logging:** Ensure all service logs are structured (JSON format) and shipped to a centralized logging platform (e.g., ELK stack, Loki, DataDog) with correlation IDs from distributed traces.
-    *   **Alerting & Monitoring:** Set up dashboards and alerts based on key metrics and log patterns to proactively identify and respond to issues.
-
-**Additional Recommendations:**
-
-*   **API Versioning:** Implement a clear API versioning strategy (e.g., pi/v1/users) for external and potentially internal APIs to manage changes gracefully.
-*   **Contract Testing:** Introduce contract testing between services to ensure API compatibility and prevent breaking changes.
-*   **Container Orchestration:** While docker-compose is great for local, consider Kubernetes or other container orchestration platforms for production deployments to manage scaling, healing, and deployments efficiently.
-*   **Automated Testing:** Ensure robust unit, integration, and end-to-end tests are in place for all services, integrated into a CI/CD pipeline.
-*   **Security Best Practices:** Review security from end-to-end, including input validation, dependency scanning, secret management, and secure communication (TLS).
+## License
+- MIT (ensure no secrets are committed)

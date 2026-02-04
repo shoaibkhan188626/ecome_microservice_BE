@@ -1,16 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
-vi.mock("@ecommerce/common", () => ({
-  JWTHelper: vi.fn().mockImplementation(() => ({
-    generateAccessToken: vi.fn().mockReturnValue("mock-access-token"),
-    generateRefreshToken: vi.fn().mockReturnValue("mock-refresh-token"),
-    verifyAccessToken: vi.fn().mockReturnValue({ sub: "user123", email: "test@test.com" }),
-    verifyRefreshToken: vi.fn().mockReturnValue({ sub: "user123" }),
-    decodeToken: vi.fn().mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 3600 }),
-  })),
-}));
+vi.mock("@ecommerce/common", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    JWTHelper: vi.fn().mockImplementation(() => ({
+      generateAccessToken: vi.fn().mockReturnValue("mock-access-token"),
+      generateRefreshToken: vi.fn().mockReturnValue("mock-refresh-token"),
+      verifyAccessToken: vi.fn().mockReturnValue({ sub: "user123", email: "test@test.com" }),
+      verifyRefreshToken: vi.fn().mockReturnValue({ sub: "user123" }),
+      decodeToken: vi.fn().mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+    })),
+  };
+});
 
-vi.mock("../../config/index.js", () => ({
+vi.mock("../../../../src/config/index.js", () => ({
   default: {
     jwt: {
       secret: "test-secret",
@@ -25,7 +29,7 @@ vi.mock("../../config/index.js", () => ({
   },
 }));
 
-const { default: tokenService } = await import("./tokenService.js");
+const { default: tokenService } = await import("../../../src/domain/services/tokenService.js");
 
 describe("TokenService", () => {
   const mockUser = {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateSendNotification } from "./validate.js";
+import { validateSendNotification } from "../../../src/api/middlewares/validate.js";
 
 vi.mock("@ecommerce/common", () => ({
   ResponseHandler: {

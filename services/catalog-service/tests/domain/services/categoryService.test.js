@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../entities/Category.js", () => ({
+vi.mock("../../../src/domain/entities/Category.js", () => ({
   default: {
     findById: vi.fn(),
     findOne: vi.fn(),
@@ -14,14 +14,18 @@ vi.mock("../entities/Category.js", () => ({
   },
 }));
 
-vi.mock("@ecommerce/common", () => ({
-  createLogger: () => ({ info: vi.fn(), error: vi.fn() }),
-}));
+vi.mock("@ecommerce/common", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    createLogger: () => ({ info: vi.fn(), error: vi.fn() }),
+  };
+});
 
-vi.mock("../../config/index.js", () => ({ default: { logLevel: "info", isProduction: false } }));
+vi.mock("../../../src/config/index.js", () => ({ default: { logLevel: "info", isProduction: false } }));
 
-const Category = (await import("../entities/Category.js")).default;
-const { default: categoryService } = await import("./categoryService.js");
+const Category = (await import("../../../src/domain/entities/Category.js")).default;
+const { default: categoryService } = await import("../../../src/domain/services/categoryService.js");
 
 describe("CategoryService", () => {
   beforeEach(() => {
