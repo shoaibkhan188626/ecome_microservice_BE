@@ -2,6 +2,7 @@ import express from "express";
 import notificationController from "../controllers/notificationController.js";
 import { asyncHandler } from "@ecommerce/common";
 import { authenticate, authorize } from "../middlewares/auth.js";
+import { validateSendNotification } from "../middlewares/validate.js";
 
 const router = express.Router();
 
@@ -12,6 +13,7 @@ router.post(
   "/send",
   authenticate,
   authorize("admin"),
+  validateSendNotification,
   asyncHandler(notificationController.sendCustom.bind(notificationController))
 );
 

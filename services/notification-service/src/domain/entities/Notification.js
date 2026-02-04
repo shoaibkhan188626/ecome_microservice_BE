@@ -126,10 +126,8 @@ const notificationSchema = new mongoose.Schema(
     },
 
     //expiry (auto-delete after x-days)
-
     expiresAt: {
       type: Date,
-      index: true,
     },
   },
   { timestamps: true },
@@ -142,7 +140,7 @@ const notificationSchema = new mongoose.Schema(
 notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ status: 1, createdAt: -1 });
 notificationSchema.index({ type: 1, channel: 1 });
-notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index
 
 /**
  * Static : Find by user

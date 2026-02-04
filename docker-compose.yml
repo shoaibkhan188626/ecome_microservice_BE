@@ -54,6 +54,7 @@ services:
       - INVENTORY_SERVICE_URL=http://inventory-service:3003
       - CART_SERVICE_URL=http://cart-service:3004
       - ORDER_SERVICE_URL=http://order-service:3005
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
     depends_on:
       - redis
       - rabbitmq
@@ -146,6 +147,32 @@ services:
     depends_on:
       - mongodb
       - redis
+    networks:
+      - ecommerce-network
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    container_name: ecommerce-notification
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=production
+      - PORT=3006
+      - MONGODB_URI=mongodb://admin:admin123@mongodb:27017/notifications?authSource=admin
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production-min-32-chars
+      - JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-in-production-min-32-chars
+      - SMTP_HOST=${SMTP_HOST:-smtp.example.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@ecommerce.com}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@ecommerce.com}
+    depends_on:
+      - mongodb
+      - rabbitmq
     networks:
       - ecommerce-network
 

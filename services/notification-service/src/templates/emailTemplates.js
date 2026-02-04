@@ -77,16 +77,16 @@ export const emailTemplates = {
             
             <div class="order-details">
               <h3>Order #${data.orderNumber}</h3>
-              <p><strong>Order Date:</strong> ${new Date(data.orderDate).toLocaleDateString()}</p>
-              <p><strong>Total:</strong> $${data.total.toFixed(2)}</p>
+              <p><strong>Order Date:</strong> ${data.orderDate ? new Date(data.orderDate).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+              <p><strong>Total:</strong> $${(data.total ?? 0).toFixed(2)}</p>
               
               <h4>Items:</h4>
-              ${data.items
+              ${(data.items || [])
                 .map(
                   (item) => `
                 <div class="item">
-                  <strong>${item.name}</strong><br>
-                  Qty: ${item.quantity} × $${item.price.toFixed(2)} = $${(item.quantity * item.price).toFixed(2)}
+                  <strong>${item.name || "Item"}</strong><br>
+                  Qty: ${item.quantity || 1} × $${(item.price ?? 0).toFixed(2)} = $${((item.quantity || 1) * (item.price ?? 0)).toFixed(2)}
                 </div>
               `,
                 )
@@ -109,7 +109,7 @@ export const emailTemplates = {
       </body>
       </html>
     `,
-    text: `Order ${data.orderNumber} confirmed! Total: $${data.total}`,
+    text: `Order ${data.orderNumber} confirmed! Total: $${(data.total ?? 0).toFixed(2)}`,
   }),
 
   /**

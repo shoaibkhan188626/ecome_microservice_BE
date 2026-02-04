@@ -37,8 +37,11 @@ router.get("/health", (req, res) => {
     },
     channels: {
       email: !!config.email?.user,
-      sms: smsService.getHealthMetrics?.() || { available: smsService.isAvailable?.() ?? false },
-      push: !!config.push?.firebaseServerKey,
+      sms: {
+        available: smsService.isAvailable?.() ?? false,
+        ...(smsService.getHealthMetrics?.() || {}),
+      },
+      push: !!config.push?.firebaseServerKey || !!config.push?.projectId,
     },
     memory: {
       used: process.memoryUsage().heapUsed,

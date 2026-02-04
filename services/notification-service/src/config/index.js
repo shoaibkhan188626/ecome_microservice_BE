@@ -32,15 +32,18 @@ class Config extends BaseConfig {
     };
   }
 
-  // SMS Configuration (Fonoster)
+  // SMS Configuration (Fonoster primary, Twilio fallback)
   get sms() {
     return {
+      provider: process.env.SMS_PROVIDER || "fonoster",
       fonosterUrl:
         process.env.FONOSTER_API_URL || "https://api.fonoster.io/v1beta1",
       apiKey: process.env.FONOSTER_API_KEY,
       apiSecret: process.env.FONOSTER_API_SECRET,
-      senderId: process.env.FONOSTER_SENDER_ID, // Your Fonoster number
-      // Advanced settings
+      senderId: process.env.FONOSTER_SENDER_ID,
+      twilioAccountSid: process.env.TWILIO_ACCOUNT_SID,
+      twilioAuthToken: process.env.TWILIO_AUTH_TOKEN,
+      twilioFromNumber: process.env.TWILIO_FROM_NUMBER,
       maxRetries: parseInt(process.env.SMS_MAX_RETRIES, 10) || 3,
       retryDelay: parseInt(process.env.SMS_RETRY_DELAY, 10) || 1000,
       batchSize: parseInt(process.env.SMS_BATCH_SIZE, 10) || 50,
@@ -51,6 +54,10 @@ class Config extends BaseConfig {
   get push() {
     return {
       firebaseServerKey: process.env.FIREBASE_SERVER_KEY,
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      useV1Api: process.env.FIREBASE_USE_V1 === "true",
     };
   }
 

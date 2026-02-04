@@ -19,7 +19,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@ecommerce/common": "workspace:*",
+    "@ecommerce/common": "file:../../packages/common",
     "@fonoster/sdk": "^0.17.1",
     "axios": "^1.13.4",
     "cookie-parser": "^1.4.7",
@@ -28,6 +28,7 @@
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "mongoose": "^9.1.5",
+    "firebase-admin": "^12.0.0",
     "nodemailer": "^7.0.13",
     "twilio": "^5.12.0"
   },
