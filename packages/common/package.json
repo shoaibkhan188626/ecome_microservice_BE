@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Tests coming soon\""
+    "test": "npx vitest run",
+    "test:watch": "npx vitest"
   },
   "keywords": [
     "microservices",
@@ -23,5 +24,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.3",
     "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.0"
   }
 }

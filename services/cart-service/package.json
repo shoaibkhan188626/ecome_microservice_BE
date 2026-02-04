@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "test": "echo \"Tests coming soon\""
+    "test": "npx vitest run",
+    "test:watch": "npx vitest"
   },
   "keywords": [
     "cart",
@@ -18,6 +19,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@ecommerce/common": "file:../../packages/common",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "eslint": "^9.39.2",
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "vitest": "^2.0.0"
   }
 }

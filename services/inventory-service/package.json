@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "test": "echo \"Tests coming soon\""
+    "test": "npx vitest run",
+    "test:watch": "npx vitest"
   },
   "keywords": [
     "inventory",
@@ -18,7 +19,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@ecommerce/common": "workspace:*",
+    "@ecommerce/common": "file:../../packages/common",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "eslint": "^9.39.2",
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "vitest": "^2.0.0"
   }
 }
