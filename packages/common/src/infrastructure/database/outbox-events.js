@@ -79,5 +79,5 @@ outboxEventSchema.statics.findPending = function (limit = 100) {
     .limit(limit);
 };
 
-const outboxEvent = mongoose.model("OutboxEvent", outboxEventSchema);
-export default outboxEvent;
+const OutboxEvent = mongoose.model("OutboxEvent", outboxEventSchema);
+export default OutboxEvent;
