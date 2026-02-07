@@ -1,4 +1,4 @@
-import { ResponseHandler } from "../utils/responseHandler.js";
+import { ResponseHandler } from "../utils/response-handler.js";
 
 export const createErrorHandler = (logger, isProduction = false) => {
   return (err, req, res, next) => {

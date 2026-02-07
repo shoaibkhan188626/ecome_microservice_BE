@@ -10,9 +10,9 @@ import {
 
 import rateLimiter, {
   strictRateLimiter,
-} from "./src/api/middlewares/rateLimiter.js";
+} from "./src/api/middlewares/rate-limiter.js";
 
-import proxyHandler from "./src/api/middlewares/proxyHandler.js";
+import proxyHandler from "./src/api/middlewares/proxy-handler.js";
 import healthRouter from "./src/api/routes/health.js";
 import cluster from "cluster";
 import os from "os";
