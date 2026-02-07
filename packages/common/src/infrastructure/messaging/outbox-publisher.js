@@ -61,7 +61,7 @@ export class OutboxPublisher {
   async processBatch() {
     // Dynamic import to avoid circular dependency
     const { default: OutboxEvent } =
-      await import("../database/outbox-event.js");
+      await import("../database/outbox-events.js");
 
     const events = await OutboxEvent.findPending(this.batchSize);
 
