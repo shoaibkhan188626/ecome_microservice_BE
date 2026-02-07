@@ -7,8 +7,8 @@ import {
   requestIdMiddleware,
   createErrorHandler,
 } from "@ecommerce/common";
-import healthRoutes, { dbConnection } from "./api/routes/healthRoutes.js";
-import authRoutes from "./api/routes/authRoutes.js";
+import healthRoutes, { dbConnection } from "./api/routes/health-routes.js";
+import authRoutes from "./api/routes/auth-routes.js";
 
 const logger = createLogger(
   "auth-service",

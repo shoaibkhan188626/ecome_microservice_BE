@@ -11,10 +11,10 @@ import {
 import healthRoutes, {
   dbConnection,
   redisClient,
-} from "./api/routes/healthRoutes.js";
-import createCartRoutes from "./api/routes/cartRoutes.js.js";
-import CartService from "./domain/services/cartService.js";
-import CartController from "./api/controllers/cartController.js";
+} from "./api/routes/health-routes.js";
+import createCartRoutes from "./api/routes/cart-routes.js";
+import CartService from "./domain/services/cart-service.js";
+import CartController from "./api/controllers/cart-controller.js";
 
 const logger = createLogger(
   "cart-service",

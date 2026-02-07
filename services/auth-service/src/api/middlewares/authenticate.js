@@ -1,4 +1,4 @@
-import tokenService from "../../domain/services/tokenService.js";
+import tokenService from "../../domain/services/token-service.js";
 import { ResponseHandler, createLogger } from "@ecommerce/common";
 import config from "../../config/index.js";
 

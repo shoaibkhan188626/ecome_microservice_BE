@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { OrderStates } from "../state-machine/orderState.js";
+import { OrderStates } from "../state-machine/order-state.js";
 
 /**
  * order model with state machine
@@ -359,7 +359,7 @@ orderSchema.methods.transitionTo = function (
  */
 
 orderSchema.methods.canTransitionTo = function (event) {
-  const { canTransition } = require("../state-machine/orderState.js");
+  const { canTransition } = require("../state-machine/order-state.js");
   return canTransition(this.status, event);
 };
 

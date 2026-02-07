@@ -10,11 +10,11 @@ import {
 import healthRoutes, {
   dbConnection,
   redisClient,
-} from "./api/routes/healthRoutes.js";
-import createInventoryRoutes from "./api/routes/inventoryRoutes.js";
-import LockManager from "./infrastructure/cache/lockManager.js";
-import InventoryService from "./domain/services/InventoryService.js";
-import InventoryController from "./api/controllers/inventoryController.js";
+} from "./api/routes/health-routes.js";
+import createInventoryRoutes from "./api/routes/inventory-routes.js";
+import LockManager from "./infrastructure/cache/lock-manager.js";
+import InventoryService from "./domain/services/inventory-service.js";
+import InventoryController from "./api/controllers/inventory-controller.js";
 
 const logger = createLogger(
   "inventory-service",

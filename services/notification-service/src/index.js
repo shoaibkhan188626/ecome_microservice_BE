@@ -8,9 +8,9 @@ import {
   requestIdMiddleware,
   createErrorHandler,
 } from "@ecommerce/common";
-import healthRoutes, { dbConnection } from "./api/routes/healthRoutes.js";
-import notificationRoutes from "./api/routes/notificationRoutes.js";
-import notificationConsumer from "./consumers/notificationConsumer.js";
+import healthRoutes, { dbConnection } from "./api/routes/health-routes.js";
+import notificationRoutes from "./api/routes/notification-routes.js";
+import notificationConsumer from "./consumers/notification-consumer.js";
 
 const logger = createLogger(
   "notification-service",

@@ -10,10 +10,10 @@ import {
 import healthRoutes, {
   dbConnection,
   redisClient,
-} from "./api/routes/healthRoutes.js";
-import createOrderRoutes from "./api/routes/orderRoutes.js";
-import OrderService from "./domain/services/orderService.js";
-import OrderController from "./api/controllers/orderController.js";
+} from "./api/routes/health-routes.js";
+import createOrderRoutes from "./api/routes/order-routes.js";
+import OrderService from "./domain/services/order-service.js";
+import OrderController from "./api/controllers/order-controller.js";
 
 const logger = createLogger(
   "order-service",
