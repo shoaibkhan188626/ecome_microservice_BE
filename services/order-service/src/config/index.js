@@ -14,7 +14,7 @@ class Config extends BaseConfig {
   }
 
   get rabbitmqUrl() {
-    return process.env.RABBITMQ_URL;
+    return process.env.RABBITMQ_URL || "amqp://localhost:5672";
   }
 
   // Order Configuration

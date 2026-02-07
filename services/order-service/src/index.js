@@ -6,6 +6,7 @@ import {
   createLogger,
   requestIdMiddleware,
   createErrorHandler,
+  OutboxPublisher, // ADDED
 } from "@ecommerce/common";
 import healthRoutes, {
   dbConnection,
@@ -31,17 +32,20 @@ const logger = createLogger(
  * - Idempotency support
  * - Inventory reservation/commit
  * - Multi-state transitions
+ * - RELIABLE EVENT PUBLISHING (Outbox Pattern) // ADDED
  *
  * Architecture:
  * - Domain-driven design
  * - Separation of concerns
- * - Atomic operations
+ * - Atomic operations with transactions
+ * - Guaranteed event delivery // ADDED
  */
 class OrderServiceApp {
   constructor() {
     this.app = express();
     this.orderService = null;
     this.orderController = null;
+    this.outboxPublisher = null; // ADDED
     this.setupMiddlewares();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -84,6 +88,7 @@ class OrderServiceApp {
           cqrs: "Command/Query separation",
           eventSourcing: "Complete state history",
           idempotency: "Duplicate request protection",
+          outboxPattern: "Guaranteed event delivery", // ADDED
         },
         endpoints: {
           health: "/health",
@@ -128,39 +133,82 @@ class OrderServiceApp {
 
   async start() {
     try {
+      // Connect to databases
       await dbConnection.connect(config.mongoUri);
       redisClient.connect(config.redisUrl);
 
-      this.app.listen(config.port, () => {
+      // START OUTBOX PUBLISHER (ADDED)
+      this.outboxPublisher = new OutboxPublisher({
+        rabbitmqUrl: config.rabbitmqUrl,
+        exchange: "order.events",
+        intervalMs: 5000, // Check every 5 seconds
+        batchSize: 100,
+        logger,
+      });
+      await this.outboxPublisher.start();
+      logger.info("📮 Outbox Publisher started");
+
+      // Start HTTP server
+      this.server = this.app.listen(config.port, () => {
         logger.info(`🚀 Order Service running on port ${config.port}`);
         logger.info(`📊 Environment: ${config.nodeEnv}`);
         logger.info(`👷 Process ID: ${process.pid}`);
         logger.info(`🔄 State Machine: Enabled`);
         logger.info(`📝 Event Sourcing: Active`);
+        logger.info(`📮 Outbox Pattern: Active`); // ADDED
       });
     } catch (error) {
       logger.error("Failed to start server:", error);
       process.exit(1);
     }
   }
+
+  // ADDED: Graceful shutdown method
+  async stop() {
+    logger.info("Shutting down gracefully...");
+
+    // Stop accepting new connections
+    if (this.server) {
+      this.server.close(() => {
+        logger.info("HTTP server closed");
+      });
+    }
+
+    // Stop outbox publisher
+    if (this.outboxPublisher) {
+      await this.outboxPublisher.stop();
+      logger.info("Outbox publisher stopped");
+    }
+
+    // Disconnect databases
+    await dbConnection.disconnect();
+    await redisClient.disconnect();
+    logger.info("Database connections closed");
+
+    process.exit(0);
+  }
 }
 
 const orderService = new OrderServiceApp();
 orderService.start();
 
+// UPDATED: Graceful shutdown handlers
 process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received. Shutting down gracefully...");
-  await dbConnection.disconnect();
-  await redisClient.disconnect();
-  process.exit(0);
+  logger.info("SIGTERM received");
+  await orderService.stop();
+});
+
+process.on("SIGINT", async () => {
+  logger.info("SIGINT received");
+  await orderService.stop();
 });
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught Exception:", err);
-  process.exit(1);
+  orderService.stop().then(() => process.exit(1));
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+  orderService.stop().then(() => process.exit(1));
 });
