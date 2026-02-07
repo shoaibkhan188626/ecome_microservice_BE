@@ -8,7 +8,7 @@ import {
   ConflictError,
   InsufficientStockError,
   RateLimitError,
-} from "../../src/errors/AppError.js";
+} from "../../src/errors/app-error.js";
 
 describe("AppError", () => {
   it("should create error with default values", () => {

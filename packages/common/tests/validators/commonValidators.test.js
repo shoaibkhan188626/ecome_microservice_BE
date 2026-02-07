@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validators } from "../../src/validators/commonValidators.js";
+import { validators } from "../../src/validators/common-validators.js";
 
 describe("validators", () => {
   describe("isEmail", () => {

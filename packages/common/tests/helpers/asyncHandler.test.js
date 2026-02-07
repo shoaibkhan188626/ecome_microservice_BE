@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { asyncHandler } from "../../src/helpers/asyncHandler.js";
+import { asyncHandler } from "../../src/helpers/async-handler.js";
 
 describe("asyncHandler", () => {
   it("should pass through successful async function result", async () => {
