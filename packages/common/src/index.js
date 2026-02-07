@@ -17,7 +17,7 @@ export {
 //Infrastructure - Payment
 export { PaymentGateway } from "./infrastructure/payment/payment-gateway.js";
 
-export {} from "./infrastructure/payment/razorpay-adapter.js";
+export { default as RazorpayAdapter } from "./infrastructure/payment/razorpay-adapter.js";
 
 //Errors
 export { AppError } from "./errors/app-error.js";
@@ -32,6 +32,7 @@ export { HTTPClient } from "./utils/http-client.js";
 export { JWTHelper } from "./utils/jwt-helper.js";
 export { ResponseHandler } from "./utils/response-handler.js";
 export { DateHelper } from "./utils/date-helper.js";
+export {PasswordHelper} from './utils/password-helper.js'
 
 //Helpers
 export { asyncHandler } from "./helpers/async-handler.js";

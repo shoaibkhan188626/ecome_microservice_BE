@@ -9,7 +9,6 @@ export class TransactionManager {
   /**
    * Execute operations within a transaction
    */
-
   async withTransaction(operations) {
     const session = await this.connection.startSession();
 
@@ -27,15 +26,14 @@ export class TransactionManager {
   }
 
   /**
-   * Execute operation and create outbox event atomically
+   * Execute operations and create outbox event atomically
    */
-
   async withOutboxEvent(operations, eventData) {
     return this.withTransaction(async (session) => {
-      //Execute business operations
+      // Execute business operations
       const result = await operations(session);
 
-      //create outbox event in same transaction
+      // Create outbox event in same transaction
       const eventId =
         eventData.eventId || new mongoose.Types.ObjectId().toString();
 
@@ -53,38 +51,8 @@ export class TransactionManager {
         ],
         { session },
       );
+
       return { result, outboxEvent };
-    });
-  }
-
-  /**
-   * For multiple events in one transaction
-   */
-
-  async withMultipleOutboxEvents(operations, eventsData) {
-    return this.withTransaction(async (session) => {
-      const result = await operations(session);
-
-      const outboxEvents = [];
-      for (const eventData of eventsData) {
-        const [event] = await OutboxEvent.create(
-          [
-            {
-              eventId:
-                eventData.eventId || new mongoose.Types.ObjectId().toString(),
-              eventType: eventData.eventType,
-              payload: eventData.payload,
-              aggregationType: eventData.aggregateType,
-              aggregationId: eventData.aggregateId || result?._id?.toString(),
-              correlationId: eventData.correlationId,
-              maxRetries: eventData.maxRetries || 5,
-            },
-          ],
-          { session },
-        );
-        outboxEvents.push(event);
-      }
-      return { result, outboxEvents };
     });
   }
 }

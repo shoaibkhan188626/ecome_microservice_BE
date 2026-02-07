@@ -59,16 +59,20 @@ const outboxEventSchema = new mongoose.Schema(
     },
 
     lastError: String,
+
     publishedAt: Date,
   },
-  { timestamps: true, collection: "outbox_events" },
+  {
+    timestamps: true,
+    collection: "outbox_events",
+  },
 );
 
-//Compound indexes for efficient querying
+// Compound indexes for efficient querying
 outboxEventSchema.index({ status: 1, nextAttemptAt: 1 });
 outboxEventSchema.index({ aggregateType: 1, aggregateId: 1 });
 
-//static methods
+// Static methods
 outboxEventSchema.statics.findPending = function (limit = 100) {
   return this.find({
     status: { $in: ["pending", "failed"] },
