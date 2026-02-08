@@ -5,6 +5,26 @@ class Config extends BaseConfig {
     return ["PORT", "MONGODB_URI"];
   }
 
+  get port() {
+    return parseInt(process.env.PORT, 10) || 3006;
+  }
+
+  get nodeEnv() {
+    return process.env.NODE_ENV || "development";
+  }
+
+  get isDevelopment() {
+    return this.nodeEnv !== "production";
+  }
+
+  get isProduction() {
+    return this.nodeEnv === "production";
+  }
+
+  get logLevel() {
+    return process.env.LOG_LEVEL || "info";
+  }
+
   get mongoUri() {
     return process.env.MONGODB_URI;
   }
@@ -15,6 +35,10 @@ class Config extends BaseConfig {
 
   get rabbitmqUrl() {
     return process.env.RABBITMQ_URL;
+  }
+
+  get allowedOrigins() {
+    return process.env.ALLOWED_ORIGINS || "*";
   }
 
   get razorPay() {
@@ -29,12 +53,16 @@ class Config extends BaseConfig {
     return {
       secretKey: process.env.STRIPE_SECRET_KEY,
       webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-      publishableKey:process.env.STRIPE_PUBLISHABLE_KEY
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
     };
   }
 
   get defaultCurrency() {
-    return "INR";
+    return process.env.DEFAULT_CURRENCY || "INR";
+  }
+
+  get defaultProvider() {
+    return process.env.DEFAULT_PROVIDER || "razorpay";
   }
 }
 

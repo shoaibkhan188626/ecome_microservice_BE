@@ -9,13 +9,26 @@ import {
   MongoConnection,
 } from "@ecommerce/common";
 
+import paymentRoutes from "./api/routes/payment-routes.js";
+
 const logger = createLogger(
   "payment-service",
   config.logLevel,
   config.isProduction,
 );
+
 const dbConnection = new MongoConnection(logger);
 
+/**
+ * Payment Service - Main Entry Point
+ *
+ * Features:
+ * - Multi-gateway payment processing (Razorpay, Stripe)
+ * - Webhook handling with idempotency protection
+ * - Idempotent payment creation
+ * - Refund processing
+ * - Real-time status tracking
+ */
 class PaymentServiceApp {
   constructor() {
     this.app = express();
@@ -26,17 +39,32 @@ class PaymentServiceApp {
   }
 
   setupMiddlewares() {
+    // Security
     this.app.use(helmet());
     this.app.use(
       cors({
-        origin: "*",
-        credentials: false,
+        origin: config.isDevelopment ? "*" : config.allowedOrigins || "*",
+        credentials: true,
       }),
     );
-    this.app.use(express.json({ limit: "1mb" }));
-    this.app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+    // Body parsing - JSON for regular API
+    this.app.use(express.json({ limit: "10mb" }));
+    this.app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+    // Raw body for webhook signature verification (must be before JSON parser for webhooks)
+    this.app.use(
+      "/api/payments/webhooks",
+      express.raw({
+        type: "application/json",
+        limit: "10mb",
+      }),
+    );
+
+    // Request ID tracking
     this.app.use(requestIdMiddleware);
 
+    // Request logging
     this.app.use((req, res, next) => {
       logger.info(`${req.method} ${req.originalUrl}`, {
         requestId: res.locals.requestId,
@@ -47,21 +75,81 @@ class PaymentServiceApp {
   }
 
   setupRoutes() {
-    // Simple root route for now
+    // Health check
+    this.app.get("/health", async (req, res) => {
+      const health = {
+        service: "payment-service",
+        status: "operational",
+        timestamp: new Date().toISOString(),
+        version: "1.0.0",
+        environment: config.nodeEnv,
+        uptime: process.uptime(),
+      };
+
+      // Check database connectivity
+      try {
+        if (dbConnection.isConnected?.()) {
+          health.database = "connected";
+        } else {
+          health.database = "disconnected";
+          health.status = "degraded";
+        }
+      } catch {
+        health.database = "unknown";
+      }
+
+      const statusCode = health.status === "operational" ? 200 : 503;
+      res.status(statusCode).json(health);
+    });
+
+    // Service info
     this.app.get("/", (req, res) => {
       res.json({
         service: "Payment Service",
         version: "1.0.0",
+        description:
+          "Multi-gateway payment processing with webhook idempotency",
         status: "operational",
+        features: {
+          gateways: ["razorpay", "stripe"],
+          idempotency: "Enabled via keys",
+          webhooks: "Signature verified + idempotent",
+          refunds: "Full and partial supported",
+          capture: "Manual capture flow",
+        },
+        endpoints: {
+          createPayment: "POST /api/payments",
+          getPayment: "GET /api/payments/:paymentId",
+          getStatus: "GET /api/payments/:paymentId/status",
+          refund: "POST /api/payments/:paymentId/refund",
+          capture: "POST /api/payments/:paymentId/capture",
+          methods: "GET /api/payments/methods",
+          webhooks: {
+            razorpay: "POST /api/payments/webhooks/razorpay",
+            stripe: "POST /api/payments/webhooks/stripe",
+          },
+          health: "GET /health",
+        },
       });
     });
 
-    // TODO: mount /api/payments routes & /webhooks/* in next step
+    // API routes - THIS WAS MISSING
+    this.app.use("/api/payments", paymentRoutes);
 
+    // 404 handler
     this.app.use((req, res) => {
       res.status(404).json({
         success: false,
-        error: { code: "NOT_FOUND", message: "Endpoint not found" },
+        error: {
+          code: "NOT_FOUND",
+          message: "Endpoint not found",
+          path: req.originalUrl,
+          method: req.method,
+        },
+        metadata: {
+          timestamp: new Date().toISOString(),
+          requestId: res.locals.requestId,
+        },
       });
     });
   }
@@ -72,11 +160,18 @@ class PaymentServiceApp {
 
   async start() {
     try {
+      // Connect to database
       await dbConnection.connect(config.mongoUri);
+      logger.info("✅ Database connected");
 
+      // Start server
       this.server = this.app.listen(config.port, () => {
-        logger.info(`🚀 Payment Service running on port ${config.port}`);
+        logger.info(`💳 Payment Service running on port ${config.port}`);
         logger.info(`📊 Environment: ${config.nodeEnv}`);
+        logger.info(`👷 Process ID: ${process.pid}`);
+        logger.info(`🔒 Idempotency: Enabled`);
+        logger.info(`🎫 Webhook Protection: Signature + Deduplication`);
+        logger.info(`💰 Gateways: Razorpay, Stripe`);
       });
     } catch (err) {
       logger.error("Failed to start Payment Service:", err);
@@ -88,8 +183,11 @@ class PaymentServiceApp {
     logger.info("🛑 Stopping Payment Service...");
     try {
       await dbConnection.disconnect();
+      logger.info("Database disconnected");
+
       if (this.server) {
         await new Promise((resolve) => this.server.close(resolve));
+        logger.info("HTTP server closed");
       }
     } catch (e) {
       logger.error("Error during shutdown:", e);
@@ -98,19 +196,21 @@ class PaymentServiceApp {
   }
 }
 
+// Start the service
 const app = new PaymentServiceApp();
 app.start().catch((err) => {
   logger.error("Startup failure:", err);
   process.exit(1);
 });
 
+// Graceful shutdown handlers
 process.on("SIGINT", () => app.stop());
 process.on("SIGTERM", () => app.stop());
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught Exception:", err);
-  process.exit(1);
+  app.stop();
 });
 process.on("unhandledRejection", (reason) => {
   logger.error("Unhandled Rejection:", { reason });
-  process.exit(1);
+  app.stop();
 });

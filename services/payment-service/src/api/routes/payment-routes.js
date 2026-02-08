@@ -9,30 +9,12 @@ const router = Router();
 
 /**
  * Create payment intent/order
- * POST /api/payments/create
+ * POST /api/payments
  */
-router.post("/create", paymentController.createPayment.bind(paymentController));
+router.post("/", paymentController.createPayment.bind(paymentController));
 
 /**
- * Get payment status
- * GET /api/payments/:paymentId
- */
-router.get(
-  "/:paymentId",
-  paymentController.getPaymentStatus.bind(paymentController),
-);
-
-/**
- * Process refund
- * POST /api/payments/:paymentId/refund
- */
-router.post(
-  "/:paymentId/refund",
-  paymentController.processRefund.bind(paymentController),
-);
-
-/**
- * Get payment methods (available gateways)
+ * Get available payment methods/gateways
  * GET /api/payments/methods
  */
 router.get(
@@ -40,11 +22,67 @@ router.get(
   paymentController.getPaymentMethods.bind(paymentController),
 );
 
+/**
+ * Get payment by ID
+ * GET /api/payments/:paymentId
+ */
+router.get(
+  "/:paymentId",
+  paymentController.getPaymentById.bind(paymentController),
+);
+
+/**
+ * Get real-time payment status from provider
+ * GET /api/payments/:paymentId/status
+ */
+router.get(
+  "/:paymentId/status",
+  paymentController.getPaymentStatus.bind(paymentController),
+);
+
+/**
+ * Get payments by order ID
+ * GET /api/payments/order/:orderId
+ */
+router.get(
+  "/order/:orderId",
+  paymentController.getPaymentByOrder.bind(paymentController),
+);
+
+/**
+ * Get payments by user ID (with pagination)
+ * GET /api/payments/user/:userId?page=1&limit=20&status=pending
+ */
+router.get(
+  "/user/:userId",
+  paymentController.getUserPayments.bind(paymentController),
+);
+
+/**
+ * Capture authorized payment
+ * POST /api/payments/:paymentId/capture
+ */
+router.post(
+  "/:paymentId/capture",
+  paymentController.capturePayment.bind(paymentController),
+);
+
+/**
+ * Refund payment (full or partial)
+ * POST /api/payments/:paymentId/refund
+ * Body: { amount?: number, reason?: string }
+ */
+router.post(
+  "/:paymentId/refund",
+  paymentController.refundPayment.bind(paymentController),
+);
+
 // ==================== WEBHOOK ROUTES ====================
 
 /**
  * Razorpay Webhook
- * Protected by idempotency middleware
+ * Protected by idempotency middleware (prevents duplicate processing)
+ * POST /api/payments/webhooks/razorpay
  */
 router.post(
   "/webhooks/razorpay",
@@ -58,7 +96,8 @@ router.post(
 
 /**
  * Stripe Webhook
- * Protected by idempotency middleware
+ * Protected by idempotency middleware (prevents duplicate processing)
+ * POST /api/payments/webhooks/stripe
  */
 router.post(
   "/webhooks/stripe",
@@ -73,7 +112,7 @@ router.post(
 // ==================== WEBHOOK DEBUG/ADMIN ROUTES ====================
 
 /**
- * Get webhook event status
+ * Get webhook event status by ID
  * GET /api/payments/webhooks/status/:eventId
  */
 router.get(
@@ -82,8 +121,8 @@ router.get(
 );
 
 /**
- * List recent webhooks
- * GET /api/payments/webhooks/list
+ * List recent webhooks (with filtering)
+ * GET /api/payments/webhooks/list?provider=razorpay&status=completed&page=1&limit=20
  */
 router.get(
   "/webhooks/list",

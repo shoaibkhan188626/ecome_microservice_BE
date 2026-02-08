@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+
 /**
  * Payment Model
  * Track all payment attempts & status across providers
@@ -6,7 +7,7 @@ import mongoose from "mongoose";
 
 const paymentSchema = new mongoose.Schema(
   {
-    //Business reference
+    // Business reference
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
@@ -36,7 +37,7 @@ const paymentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
     },
 
-    //financial
+    // Financial
     amount: {
       type: Number,
       required: true,
@@ -49,7 +50,7 @@ const paymentSchema = new mongoose.Schema(
       uppercase: true,
     },
 
-    //Status
+    // Status
     status: {
       type: String,
       enum: [
@@ -57,8 +58,10 @@ const paymentSchema = new mongoose.Schema(
         "pending",
         "authorized",
         "succeeded",
+        "captured",
         "failed",
         "refunded",
+        "partially_refunded",
         "cancelled",
       ],
       default: "created",
@@ -67,19 +70,32 @@ const paymentSchema = new mongoose.Schema(
     errorCode: String,
     errorMessage: String,
 
-    //Idempotency & Safety
+    // Refund tracking (ADDED)
+    refundedAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    capturedAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // Idempotency & Safety
     idempotencyKey: {
       type: String,
       index: { unique: true, sparse: true },
     },
 
-    //timeline
+    // Timeline
     createdAtProvider: Date,
     succeededAt: Date,
+    capturedAt: Date,
     failedAt: Date,
     refundedAt: Date,
 
-    //audit
+    // Audit
     logs: [
       {
         at: { type: Date, default: Date.now },
@@ -91,9 +107,10 @@ const paymentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-//indexes
+// Indexes
 paymentSchema.index({ orderId: 1, provider: 1 });
 paymentSchema.index({ providerPaymentId: 1 });
+paymentSchema.index({ userId: 1, createdAt: -1 }); // ADDED: For user payment history
 
 paymentSchema.methods.addLog = function (event, details = null) {
   this.logs.push({ at: new Date(), event, details });
