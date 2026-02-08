@@ -190,4 +190,58 @@ export class RazorpayGateway extends BasePaymentGateway {
       raw: refund,
     };
   }
+
+  // Add to razorpay-gateway.js
+
+  async getPaymentStatus(providerPaymentId) {
+    try {
+      const response = await this.httpClient.get(
+        `/payments/${providerPaymentId}`,
+      );
+      return {
+        status: this.mapStatus(response.data.status),
+        amount: response.data.amount / 100,
+        captured: response.data.captured,
+      };
+    } catch (error) {
+      throw new Error(`Failed to get status: ${error.message}`);
+    }
+  }
+
+  async capturePayment({ providerPaymentId, amount }) {
+    try {
+      const response = await this.httpClient.post(
+        `/payments/${providerPaymentId}/capture`,
+        {
+          amount: Math.round(amount * 100),
+        },
+      );
+      return {
+        id: response.data.id,
+        status: "captured",
+        amount: response.data.amount / 100,
+      };
+    } catch (error) {
+      throw new Error(`Capture failed: ${error.message}`);
+    }
+  }
+
+  async refundPayment({ providerPaymentId, amount, reason }) {
+    try {
+      const payload = {};
+      if (amount) payload.amount = Math.round(amount * 100);
+
+      const response = await this.httpClient.post(
+        `/payments/${providerPaymentId}/refund`,
+        payload,
+      );
+      return {
+        id: response.data.id,
+        status: response.data.status,
+        amount: response.data.amount / 100,
+      };
+    } catch (error) {
+      throw new Error(`Refund failed: ${error.message}`);
+    }
+  }
 }
