@@ -86,4 +86,4 @@ eCom_BE is a modular backend for e‑commerce built as independent Node.js micro
 - Notification: [services/notification-service/README.md](file:///c:/Users/shoai/OneDrive/Desktop/eCom_BE/services/notification-service/README.md)
 
 ## License
-- MIT (ensure no secrets are committed)
+- MIT 
