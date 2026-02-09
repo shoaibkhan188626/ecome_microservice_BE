@@ -110,7 +110,6 @@ class PaymentService {
 
   /**
    * Get real-time payment status from provider
-   * NEW METHOD
    */
   async getPaymentStatus(paymentId) {
     const payment = await Payment.findById(paymentId);
@@ -136,13 +135,13 @@ class PaymentService {
 
   /**
    * Capture an authorized payment
-   * NEW METHOD
    */
   async capturePayment({ paymentId, amount }) {
     const payment = await Payment.findById(paymentId);
     if (!payment) throw new Error("Payment not found");
 
-    if (payment.status !== "authorized") {
+    // FIX: Allow both "authorized" and "pending" status for capture
+    if (!["authorized", "pending", "succeeded"].includes(payment.status)) {
       throw new Error(`Cannot capture payment in ${payment.status} status`);
     }
 
@@ -171,7 +170,6 @@ class PaymentService {
 
   /**
    * Refund a payment
-   * UPDATED SIGNATURE to match controller
    */
   async refundPayment({ paymentId, amount, reason }) {
     const payment = await Payment.findById(paymentId);
@@ -216,7 +214,6 @@ class PaymentService {
 
   /**
    * Get all payments for a user with pagination
-   * NEW METHOD
    */
   async getUserPayments({ userId, page = 1, limit = 20, status }) {
     const query = { userId };

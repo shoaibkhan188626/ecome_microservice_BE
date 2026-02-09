@@ -1,0 +1,28 @@
+# .dockerignore
+
+# Ignore Git history
+.git
+.gitignore
+
+# Ignore local environment variables
+.env
+*.env.local
+
+# Ignore IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Ignore logs and test reports
+logs/
+coverage/
+npm-debug.log*
+
+# CRITICAL: Ignore the root node_modules. Docker will install its own.
+# The '!' negates the rule, but it's safer to be explicit.
+node_modules/
+
+# Do NOT ignore the source code!
+# The following lines are intentionally left out:
+# !packages/
+# !services/

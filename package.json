@@ -2,26 +2,25 @@
   "name": "ecommerce-platform",
   "version": "1.0.0",
   "private": true,
-  "description": "Production-ready microservices e-commerce platform",
   "workspaces": [
     "packages/*",
     "services/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "build:common": "cd packages/common && npm run build",
-    "test": "npm run test --workspaces --if-present",
+    "// --- SETUP SCRIPTS ---": "",
+    "bootstrap": "npm install && npm run build:common",
+    "build:common": "npm run build -w @ecommerce/common",
+    "// --- DEVELOPMENT SCRIPTS ---": "",
+    "infra": "docker compose up -d mongodb redis rabbitmq",
+    "infra:stop": "docker compose stop",
+    "dev": "concurrently -n \"INFRA,GATEWAY,AUTH,CATALOG\" -c \"gray,magenta,blue,green\" \"npm run infra\" \"npm run dev -w api-gateway\" \"npm run dev -w auth-service\" \"npm run dev -w catalog-service\"",
+    "// --- MAINTENANCE ---": "",
     "clean": "npm run clean --workspaces --if-present",
-    "bootstrap": "npm install && npm run build:common && npm run link:common",
-    "link:common": "cd packages/common && npm link && cd ../.. && npm run link:services",
-    "link:services": "Get-ChildItem -Path services -Directory | ForEach-Object { cd $_.FullName; npm link @ecommerce/common; cd ../.. }"
+    "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
+    "concurrently": "^8.2.0",
     "eslint": "^8.55.0",
     "prettier": "^3.1.0"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
   }
 }

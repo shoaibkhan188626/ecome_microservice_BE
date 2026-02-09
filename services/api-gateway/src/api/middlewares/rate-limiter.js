@@ -2,11 +2,6 @@ import rateLimit from "express-rate-limit";
 import config from "../../config/index.js";
 import { createLogger, ResponseHandler } from "@ecommerce/common";
 
-/**
- * Token Bucket Algorithm implementation
- * More flexible than fixed window - allows bursts while maintaining average rate
- */
-
 const logger = createLogger(
   "api-gateway",
   config.logLevel,
@@ -15,19 +10,23 @@ const logger = createLogger(
 
 const rateLimiter = rateLimit({
   windowMs: config.rateLimiting.windowMs,
-  max: config.rateLimiting.maxRequest,
+  max: config.rateLimiting.maxRequests,
   standardHeaders: config.rateLimiting.standardHeaders,
   legacyHeaders: config.rateLimiting.legacyHeaders,
 
-  //Custom key generator - uses IP by default, can be extended to use API key
+  // 1. FIX: Remove the custom keyGenerator entirely. 
+  // By default, it uses req.ip, which is what you want.
 
-  keyGenerator: (req) => {
-    return req.ip || req.connection.remoteAddress;
-  },
+  // 2. FIX: Add this validation setting to stop the IPv6 crash.
+  // This tells the library to trust the IP provided by Express.
+  validate: { xForwardedForHeader: false },
+
+  skip: (req) =>
+    req.path === "/health" || req.path === "/live" || req.path === "/ready",
 
   handler: (req, res) => {
     logger.warn(`Rate limit Exceeded for IP :${req.ip}`);
-    ResponseHandler.rateLimitExceeded(res);
+    ResponseHandler.error(res, "RATE_LIMIT_EXCEEDED", "Too many requests", 429);
   },
 
   skipSuccessfulRequests: false,
@@ -39,9 +38,16 @@ export const strictRateLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  // Also add validation here to be safe
+  validate: { xForwardedForHeader: false },
   handler: (req, res) => {
     logger.warn(`Strict rate limit exceeded for IP : ${req.ip}`);
-    ResponseHandler.rateLimitExceeded(res);
+    ResponseHandler.error(
+      res,
+      "RATE_LIMIT_EXCEEDED",
+      "Too many failed attempts",
+      429,
+    );
   },
 });
 

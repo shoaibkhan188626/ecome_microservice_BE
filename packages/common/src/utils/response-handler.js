@@ -63,6 +63,13 @@ export class ResponseHandler {
     return this.error(res, "INSUFFICIENT_STOCK", message, 409);
   }
 
+  static rateLimitExceeded(
+    res,
+    message = "Too many requests, please try again later.",
+  ) {
+    return this.error(res, "RATE_LIMIT_EXCEEDED", message, 429);
+  }
+
   static paginated(res, data, page, limit, total) {
     const totalPages = Math.ceil(total / limit);
 

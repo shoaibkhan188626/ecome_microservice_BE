@@ -7,6 +7,7 @@ import {
   requestIdMiddleware,
   createErrorHandler,
   MongoConnection,
+  OutboxPublisher, // <--- ADDED: Critical for Event Architecture
 } from "@ecommerce/common";
 
 import paymentRoutes from "./api/routes/payment-routes.js";
@@ -19,27 +20,17 @@ const logger = createLogger(
 
 const dbConnection = new MongoConnection(logger);
 
-/**
- * Payment Service - Main Entry Point
- *
- * Features:
- * - Multi-gateway payment processing (Razorpay, Stripe)
- * - Webhook handling with idempotency protection
- * - Idempotent payment creation
- * - Refund processing
- * - Real-time status tracking
- */
 class PaymentServiceApp {
   constructor() {
     this.app = express();
     this.server = null;
+    this.outboxPublisher = null; // <--- ADDED: To store the publisher instance
     this.setupMiddlewares();
     this.setupRoutes();
     this.setupErrorHandling();
   }
 
   setupMiddlewares() {
-    // Security
     this.app.use(helmet());
     this.app.use(
       cors({
@@ -52,7 +43,7 @@ class PaymentServiceApp {
     this.app.use(express.json({ limit: "10mb" }));
     this.app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-    // Raw body for webhook signature verification (must be before JSON parser for webhooks)
+    // Raw body for webhook signature verification
     this.app.use(
       "/api/payments/webhooks",
       express.raw({
@@ -61,10 +52,8 @@ class PaymentServiceApp {
       }),
     );
 
-    // Request ID tracking
     this.app.use(requestIdMiddleware);
 
-    // Request logging
     this.app.use((req, res, next) => {
       logger.info(`${req.method} ${req.originalUrl}`, {
         requestId: res.locals.requestId,
@@ -75,7 +64,7 @@ class PaymentServiceApp {
   }
 
   setupRoutes() {
-    // Health check
+    // Health check (Restored your detailed version)
     this.app.get("/health", async (req, res) => {
       const health = {
         service: "payment-service",
@@ -86,7 +75,6 @@ class PaymentServiceApp {
         uptime: process.uptime(),
       };
 
-      // Check database connectivity
       try {
         if (dbConnection.isConnected?.()) {
           health.database = "connected";
@@ -102,7 +90,7 @@ class PaymentServiceApp {
       res.status(statusCode).json(health);
     });
 
-    // Service info
+    // Service info (Restored your detailed version)
     this.app.get("/", (req, res) => {
       res.json({
         service: "Payment Service",
@@ -133,7 +121,7 @@ class PaymentServiceApp {
       });
     });
 
-    // API routes - THIS WAS MISSING
+    // API routes
     this.app.use("/api/payments", paymentRoutes);
 
     // 404 handler
@@ -160,11 +148,20 @@ class PaymentServiceApp {
 
   async start() {
     try {
-      // Connect to database
+      // 1. Connect to Database
       await dbConnection.connect(config.mongoUri);
       logger.info("✅ Database connected");
 
-      // Start server
+      // 2. Start Outbox Publisher (ADDED: Critical for Order Service integration)
+      this.outboxPublisher = new OutboxPublisher({
+        rabbitmqUrl: config.rabbitmqUrl,
+        exchange: "payment.events",
+        logger,
+      });
+      await this.outboxPublisher.start();
+      logger.info("📮 Outbox Publisher started");
+
+      // 3. Start Server
       this.server = this.app.listen(config.port, () => {
         logger.info(`💳 Payment Service running on port ${config.port}`);
         logger.info(`📊 Environment: ${config.nodeEnv}`);
@@ -182,13 +179,19 @@ class PaymentServiceApp {
   async stop() {
     logger.info("🛑 Stopping Payment Service...");
     try {
-      await dbConnection.disconnect();
-      logger.info("Database disconnected");
-
       if (this.server) {
         await new Promise((resolve) => this.server.close(resolve));
         logger.info("HTTP server closed");
       }
+
+      // 4. Stop Publisher Gracefully (ADDED)
+      if (this.outboxPublisher) {
+        await this.outboxPublisher.stop();
+        logger.info("Outbox publisher stopped");
+      }
+
+      await dbConnection.disconnect();
+      logger.info("Database disconnected");
     } catch (e) {
       logger.error("Error during shutdown:", e);
     }

@@ -3,11 +3,17 @@ FROM node:20-alpine
 # Create app directory
 WORKDIR /usr/src/app
 
-# Install app dependencies
+# 2. Copy Root and Package definitions first (Optimizes Cache)
+# We need the root package.json to understand the workspaces configuration
 COPY package*.json ./
-RUN npm ci --only=production
+COPY packages/common/package*.json ./packages/common/
+COPY services/api-gateway/package*.json ./services/api-gateway/
 
-# Copy app source
+# 3. Install dependencies
+# Running 'npm install' at the root installs all dependencies and links @ecommerce/common
+RUN npm install
+
+# 4. Copy the entire project source code, respecting .dockerignore
 COPY . .
 
 # Create non-root user
@@ -19,6 +25,9 @@ RUN chown -R nodejs:nodejs /usr/src/app
 
 USER nodejs
 
+# 5. Switch to the service directory
+WORKDIR /usr/src/app/services/api-gateway
+
 # Expose port
 EXPOSE 3000
 
@@ -26,4 +35,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-CMD ["node", "src/index.js"]
+# 7. Start the service
+CMD ["npm", "start"]

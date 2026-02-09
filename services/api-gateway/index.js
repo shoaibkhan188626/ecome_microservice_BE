@@ -32,6 +32,7 @@ class ApiGateway {
   }
 
   setupMiddlewares() {
+    this.app.set("trust proxy", 1);
     this.app.use(helmet());
     this.app.use(
       cors({

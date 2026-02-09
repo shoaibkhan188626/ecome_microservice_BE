@@ -12,14 +12,14 @@ const logger = createLogger(
 
 /**
  * Razorpay Gateway
- * Best for indian users : UPI, cards, net banking, wallets
+ * Best for Indian users: UPI, cards, net banking, wallets
  */
 
 export class RazorpayGateway extends BasePaymentGateway {
   constructor() {
     super("razorpay");
 
-    if (!config.razorPay.keyId || !config.razorPay.keySecret) {
+    if (!config.razorPay?.keyId || !config.razorPay?.keySecret) {
       logger.warn("Razorpay not configured, running in mock mode");
       this.client = null;
       return;
@@ -35,7 +35,6 @@ export class RazorpayGateway extends BasePaymentGateway {
   /**
    * Create Razorpay order (payment intent equivalent)
    */
-
   async createPaymentIntent({
     amount,
     currency,
@@ -44,7 +43,7 @@ export class RazorpayGateway extends BasePaymentGateway {
     metadata = {},
   }) {
     if (!this.client) {
-      //Mock mode
+      // Mock mode
       const mockOrderId = `order_${Date.now()}`;
       logger.info(`(MOCK) Razorpay order created: ${mockOrderId}`);
 
@@ -55,7 +54,7 @@ export class RazorpayGateway extends BasePaymentGateway {
         amount,
         currency,
         clientData: {
-          keyId: config.razorPay.keyId || "mock_key",
+          keyId: config.razorPay?.keyId || "mock_key",
           orderId: mockOrderId,
           amount: amount * 100,
           currency: currency || config.defaultCurrency,
@@ -95,9 +94,102 @@ export class RazorpayGateway extends BasePaymentGateway {
   }
 
   /**
+   * Get payment status from Razorpay
+   */
+  async getPaymentStatus(providerPaymentId) {
+    if (!this.client) {
+      return { status: "succeeded", amount: 0, captured: true, mock: true };
+    }
+
+    try {
+      const payment = await this.client.payments.fetch(providerPaymentId);
+
+      return {
+        status: this.mapStatus(payment.status),
+        amount: payment.amount / 100,
+        captured: payment.captured,
+        method: payment.method,
+        raw: payment,
+      };
+    } catch (error) {
+      throw new Error(`Failed to get payment status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Capture authorized payment
+   */
+  async capturePayment({ providerPaymentId, amount }) {
+    if (!this.client) {
+      logger.info(`(MOCK) Capture payment: ${providerPaymentId}`);
+      return { id: providerPaymentId, status: "captured", amount, mock: true };
+    }
+
+    try {
+      const captureAmount = amount ? Math.round(amount * 100) : undefined;
+
+      const payment = await this.client.payments.capture(
+        providerPaymentId,
+        captureAmount,
+      );
+
+      return {
+        id: payment.id,
+        status: "captured",
+        amount: payment.amount / 100,
+        raw: payment,
+      };
+    } catch (error) {
+      throw new Error(`Capture failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Refund via Razorpay
+   */
+  async refundPayment({ providerPaymentId, amount, reason }) {
+    if (!this.client) {
+      logger.info(`(MOCK) Refund processed for payment: ${providerPaymentId}`);
+      return {
+        id: `refund_${Date.now()}`,
+        status: "processed",
+        amount: amount || 0,
+        mock: true,
+      };
+    }
+
+    if (!providerPaymentId) {
+      throw new Error("providerPaymentId required for refund");
+    }
+
+    const options = {};
+    if (amount) {
+      options.amount = Math.round(amount * 100);
+    }
+    if (reason) {
+      options.notes = { reason };
+    }
+
+    const refund = await this.client.payments.refund(
+      providerPaymentId,
+      options,
+    );
+
+    logger.info(
+      `Razorpay refund created: ${refund.id} for payment: ${providerPaymentId}`,
+    );
+
+    return {
+      id: refund.id,
+      status: refund.status,
+      amount: refund.amount / 100,
+      raw: refund,
+    };
+  }
+
+  /**
    * Handle Razorpay webhook
    */
-
   async handleWebhook(rawBody, headers) {
     const signature = headers["x-razorpay-signature"];
 
@@ -105,39 +197,46 @@ export class RazorpayGateway extends BasePaymentGateway {
       throw new Error("Razorpay webhook secret not configured");
     }
 
-    const expectSignature = crypto
+    // Verify signature
+    const expectedSignature = crypto
       .createHmac("sha256", this.webhookSecret)
       .update(rawBody)
       .digest("hex");
 
-    if (expectSignature !== signature) {
+    if (expectedSignature !== signature) {
       throw new Error("Invalid Razorpay webhook signature");
     }
 
     const payload = JSON.parse(rawBody.toString("utf8"));
-
     const eventType = payload.event;
-    const entity =
-      payload.payload?.payment?.entity || payload.payload?.order?.entity;
 
-    const providerPaymentId = entity?.id;
-    const providerOrderId = entity?.order_id || entity?.id;
-    const amount = entity?.amount ? entity.amount / 100 : null;
+    // Extract entity based on event type
+    let entity;
+    if (payload.payload?.payment?.entity) {
+      entity = payload.payload.payment.entity;
+    } else if (payload.payload?.order?.entity) {
+      entity = payload.payload.order.entity;
+    } else {
+      entity = {};
+    }
+
+    const providerPaymentId = entity.id;
+    const providerOrderId = entity.order_id || entity.receipt || entity.id;
+    const amount = entity.amount ? entity.amount / 100 : null;
     const currency = entity.currency || config.defaultCurrency;
 
+    // Map Razorpay status to our status
     let status = "pending";
-
     switch (eventType) {
       case "payment.captured":
+      case "order.paid":
         status = "succeeded";
         break;
-
       case "payment.failed":
         status = "failed";
         break;
-
-      case "order.paid":
-        status = "succeeded";
+      case "refund.processed":
+        status = "refunded";
         break;
       default:
         status = "pending";
@@ -156,92 +255,33 @@ export class RazorpayGateway extends BasePaymentGateway {
   }
 
   /**
-   * Refund via Razorpay
+   * Verify webhook signature (public method)
    */
+  verifySignature(rawBody, signature, secret) {
+    const expectedSignature = crypto
+      .createHmac("sha256", secret || this.webhookSecret)
+      .update(rawBody)
+      .digest("hex");
 
-  async refundPayment(payment, amount = null) {
-    if (!this.client) {
-      logger.info(`(MOCK) Refund processed for payment ${payment._id}`);
-      return {
-        success: true,
-        provider: "razorpay",
-        mock: true,
-      };
-    }
-
-    if (!payment.providerPaymentId) {
-      throw new Error("providerPaymentId required for refund");
-    }
-
-    const options = {};
-
-    if (amount) {
-      options.amount = Math.round(amount * 100);
-    }
-
-    const refund = await this.client.payments.refund(
-      payment.providerPaymentId,
-      options,
+    return crypto.timingSafeEqual(
+      Buffer.from(expectedSignature),
+      Buffer.from(signature),
     );
+  }
 
-    return {
-      success: true,
-      provider: "razorpay",
-      raw: refund,
+  /**
+   * Map Razorpay status to our standard status
+   */
+  mapStatus(razorpayStatus) {
+    const statusMap = {
+      created: "created",
+      authorized: "authorized",
+      captured: "succeeded",
+      refunded: "refunded",
+      failed: "failed",
     };
-  }
-
-  // Add to razorpay-gateway.js
-
-  async getPaymentStatus(providerPaymentId) {
-    try {
-      const response = await this.httpClient.get(
-        `/payments/${providerPaymentId}`,
-      );
-      return {
-        status: this.mapStatus(response.data.status),
-        amount: response.data.amount / 100,
-        captured: response.data.captured,
-      };
-    } catch (error) {
-      throw new Error(`Failed to get status: ${error.message}`);
-    }
-  }
-
-  async capturePayment({ providerPaymentId, amount }) {
-    try {
-      const response = await this.httpClient.post(
-        `/payments/${providerPaymentId}/capture`,
-        {
-          amount: Math.round(amount * 100),
-        },
-      );
-      return {
-        id: response.data.id,
-        status: "captured",
-        amount: response.data.amount / 100,
-      };
-    } catch (error) {
-      throw new Error(`Capture failed: ${error.message}`);
-    }
-  }
-
-  async refundPayment({ providerPaymentId, amount, reason }) {
-    try {
-      const payload = {};
-      if (amount) payload.amount = Math.round(amount * 100);
-
-      const response = await this.httpClient.post(
-        `/payments/${providerPaymentId}/refund`,
-        payload,
-      );
-      return {
-        id: response.data.id,
-        status: response.data.status,
-        amount: response.data.amount / 100,
-      };
-    } catch (error) {
-      throw new Error(`Refund failed: ${error.message}`);
-    }
+    return statusMap[razorpayStatus] || razorpayStatus;
   }
 }
+
+export default RazorpayGateway;
