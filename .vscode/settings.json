@@ -4,6 +4,8 @@
         "Fonoster",
         "netbanking",
         "Paise",
-        "RABBITMQ"
+        "RABBITMQ",
+        "semconv",
+        "SEMRESATTRS"
     ]
 }

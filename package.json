@@ -13,7 +13,7 @@
     "// --- DEVELOPMENT SCRIPTS ---": "",
     "infra": "docker compose up -d mongodb redis rabbitmq",
     "infra:stop": "docker compose stop",
-    "dev": "concurrently -n \"INFRA,GATEWAY,AUTH,CATALOG\" -c \"gray,magenta,blue,green\" \"npm run infra\" \"npm run dev -w api-gateway\" \"npm run dev -w auth-service\" \"npm run dev -w catalog-service\"",
+    "dev": "concurrently -n \"INFRA,GATEWAY,AUTH,CATALOG,INVENTORY,CART,ORDER,NOTIFY\" -c \"gray,magenta,blue,green,yellow,cyan,red,white\" \"npm run infra\" \"npm run dev -w api-gateway\" \"npm run dev -w auth-service\" \"npm run dev -w catalog-service\" \"npm run dev -w inventory-service\" \"npm run dev -w cart-service\" \"npm run dev -w order-service\" \"npm run dev -w notification-service\"",
     "// --- MAINTENANCE ---": "",
     "clean": "npm run clean --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
