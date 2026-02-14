@@ -6,6 +6,9 @@ import {
   createLogger,
   requestIdMiddleware,
   createErrorHandler,
+  initTracing,
+  shutdownTracing,
+  initBusinessMetrics,
 } from "@ecommerce/common";
 import healthRoutes, { dbConnection } from "./api/routes/health-routes.js";
 import authRoutes from "./api/routes/auth-routes.js";
@@ -19,6 +22,7 @@ const logger = createLogger(
 class AuthService {
   constructor() {
     this.app = express();
+    this.server = null; // ADDED: Store server instance
     this.setupMiddlewares();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -58,6 +62,9 @@ class AuthService {
         service: "Auth Service",
         version: "1.0.0",
         status: "operational",
+        features: {
+          observability: "OpenTelemetry + Prometheus", // ADDED
+        },
         endpoints: {
           health: "/health",
           register: "POST /auth/register",
@@ -65,6 +72,7 @@ class AuthService {
           refresh: "POST /auth/refresh",
           logout: "POST /auth/logout",
           me: "GET /auth/me",
+          metrics: "GET /metrics", // ADDED
         },
       });
     });
@@ -92,11 +100,20 @@ class AuthService {
 
   async start() {
     try {
+      // ADDED: Initialize OpenTelemetry metrics
+      const metricsPort = parseInt(config.port) + 1000; // 3001 -> 4001
+      initTracing("auth-service", metricsPort);
+      initBusinessMetrics();
+
       await dbConnection.connect(config.mongoUri);
 
-      this.app.listen(config.port, () => {
+      // ADDED: Store server instance
+      this.server = this.app.listen(config.port, () => {
         logger.info(`🚀 Auth Service running on port ${config.port}`);
-        logger.info(`📊 Environment: ${config.nodeEnv}`);
+        logger.info(
+          `📊 Metrics available at http://localhost:${metricsPort}/metrics`,
+        ); // ADDED
+        logger.info(`🔍 Environment: ${config.nodeEnv}`);
         logger.info(`👷 Process ID: ${process.pid}`);
       });
     } catch (error) {
@@ -104,23 +121,40 @@ class AuthService {
       process.exit(1);
     }
   }
+
+  // ADDED: Graceful shutdown method
+  async stop() {
+    logger.info("🛑 Stopping Auth Service...");
+    try {
+      await shutdownTracing(); // ADDED
+
+      if (this.server) {
+        await new Promise((resolve) => this.server.close(resolve));
+        logger.info("HTTP server closed");
+      }
+
+      await dbConnection.disconnect();
+      logger.info("Database disconnected");
+    } catch (e) {
+      logger.error("Error during shutdown:", e);
+    }
+    process.exit(0);
+  }
 }
 
 const authService = new AuthService();
 authService.start();
 
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received. Shutting down gracefully...");
-  await dbConnection.disconnect();
-  process.exit(0);
-});
+// UPDATED: Use stop() method for graceful shutdown
+process.on("SIGTERM", () => authService.stop());
+process.on("SIGINT", () => authService.stop()); // ADDED
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught Exception:", err);
-  process.exit(1);
+  authService.stop(); // UPDATED
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+  authService.stop(); // UPDATED
 });

@@ -7,9 +7,12 @@ import {
   requestIdMiddleware,
   createErrorHandler,
   MongoConnection,
-  OutboxPublisher, // <--- ADDED: Critical for Event Architecture
+  OutboxPublisher,
+  initTracing,
+  shutdownTracing,
+  initBusinessMetrics,
+  recordPayment, // This is a function that records metrics
 } from "@ecommerce/common";
-
 import paymentRoutes from "./api/routes/payment-routes.js";
 
 const logger = createLogger(
@@ -24,7 +27,7 @@ class PaymentServiceApp {
   constructor() {
     this.app = express();
     this.server = null;
-    this.outboxPublisher = null; // <--- ADDED: To store the publisher instance
+    this.outboxPublisher = null;
     this.setupMiddlewares();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -64,7 +67,7 @@ class PaymentServiceApp {
   }
 
   setupRoutes() {
-    // Health check (Restored your detailed version)
+    // Health check
     this.app.get("/health", async (req, res) => {
       const health = {
         service: "payment-service",
@@ -73,6 +76,15 @@ class PaymentServiceApp {
         version: "1.0.0",
         environment: config.nodeEnv,
         uptime: process.uptime(),
+        features: {
+          observability: "OpenTelemetry + Prometheus",
+          gateways: ["razorpay", "stripe"],
+          idempotency: "Enabled via keys",
+          webhooks: "Signature verified + idempotent",
+          refunds: "Full and partial supported",
+          capture: "Manual capture flow",
+          outboxPattern: "Guaranteed event delivery",
+        },
       };
 
       try {
@@ -90,7 +102,7 @@ class PaymentServiceApp {
       res.status(statusCode).json(health);
     });
 
-    // Service info (Restored your detailed version)
+    // Service info
     this.app.get("/", (req, res) => {
       res.json({
         service: "Payment Service",
@@ -98,13 +110,6 @@ class PaymentServiceApp {
         description:
           "Multi-gateway payment processing with webhook idempotency",
         status: "operational",
-        features: {
-          gateways: ["razorpay", "stripe"],
-          idempotency: "Enabled via keys",
-          webhooks: "Signature verified + idempotent",
-          refunds: "Full and partial supported",
-          capture: "Manual capture flow",
-        },
         endpoints: {
           createPayment: "POST /api/payments",
           getPayment: "GET /api/payments/:paymentId",
@@ -116,7 +121,8 @@ class PaymentServiceApp {
             razorpay: "POST /api/payments/webhooks/razorpay",
             stripe: "POST /api/payments/webhooks/stripe",
           },
-          health: "GET /health",
+          health: "/health",
+          metrics: "GET /metrics",
         },
       });
     });
@@ -148,11 +154,16 @@ class PaymentServiceApp {
 
   async start() {
     try {
+      // ADDED: Initialize OpenTelemetry FIRST (before DB connections)
+      const metricsPort = parseInt(config.port) + 1000; // 3006 -> 4006
+      initTracing("payment-service", metricsPort);
+      initBusinessMetrics();
+
       // 1. Connect to Database
       await dbConnection.connect(config.mongoUri);
       logger.info("✅ Database connected");
 
-      // 2. Start Outbox Publisher (ADDED: Critical for Order Service integration)
+      // 2. Start Outbox Publisher
       this.outboxPublisher = new OutboxPublisher({
         rabbitmqUrl: config.rabbitmqUrl,
         exchange: "payment.events",
@@ -164,8 +175,11 @@ class PaymentServiceApp {
       // 3. Start Server
       this.server = this.app.listen(config.port, () => {
         logger.info(`💳 Payment Service running on port ${config.port}`);
-        logger.info(`📊 Environment: ${config.nodeEnv}`);
-        logger.info(`👷 Process ID: ${process.pid}`);
+        logger.info(
+          `📊 Metrics available at http://localhost:${metricsPort}/metrics`,
+        );
+        logger.info(`🔧 Environment: ${config.nodeEnv}`);
+        logger.info(`🆔 Process ID: ${process.pid}`);
         logger.info(`🔒 Idempotency: Enabled`);
         logger.info(`🎫 Webhook Protection: Signature + Deduplication`);
         logger.info(`💰 Gateways: Razorpay, Stripe`);
@@ -176,15 +190,18 @@ class PaymentServiceApp {
     }
   }
 
+  // ADDED: Graceful shutdown method
   async stop() {
     logger.info("🛑 Stopping Payment Service...");
     try {
+      await shutdownTracing(); // ADDED: Shutdown OpenTelemetry
+
       if (this.server) {
         await new Promise((resolve) => this.server.close(resolve));
         logger.info("HTTP server closed");
       }
 
-      // 4. Stop Publisher Gracefully (ADDED)
+      // Stop outbox publisher
       if (this.outboxPublisher) {
         await this.outboxPublisher.stop();
         logger.info("Outbox publisher stopped");
@@ -206,13 +223,15 @@ app.start().catch((err) => {
   process.exit(1);
 });
 
-// Graceful shutdown handlers
+// UPDATED: Use stop() method for graceful shutdown
 process.on("SIGINT", () => app.stop());
 process.on("SIGTERM", () => app.stop());
+
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught Exception:", err);
   app.stop();
 });
+
 process.on("unhandledRejection", (reason) => {
   logger.error("Unhandled Rejection:", { reason });
   app.stop();

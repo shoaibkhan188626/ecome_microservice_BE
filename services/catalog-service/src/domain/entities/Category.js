@@ -1,4 +1,4 @@
-import mongoose, { mongo } from "mongoose";
+import mongoose from "mongoose";
 import slugify from "slugify";
 
 /**
@@ -54,6 +54,22 @@ const categorySchema = new mongoose.Schema(
       ref: "Category",
       default: null,
       index: true,
+      validate: {
+        validator: async function (v) {
+          if (!v) return true;
+          if (this._id && v.equals(this._id)) return false;
+
+          const parent = await mongoose.model("Category").findById(v);
+          if (!parent) return false;
+
+          // Fast cycle check using path
+          if (this.path && parent.path.startsWith(this.path + "/")) {
+            return false;
+          }
+          return true;
+        },
+        message: "Invalid parent or circular reference.",
+      },
     },
 
     // Level in tree (0=root)
@@ -62,12 +78,14 @@ const categorySchema = new mongoose.Schema(
       required: true,
       default: 0,
       index: true,
+      min: [0, "Level cannot be true"],
     },
 
     //   Order for display
     order: {
       type: Number,
       default: 0,
+      min: [0, "order cannot be negative"],
     },
 
     //   SEO fields
@@ -98,6 +116,7 @@ const categorySchema = new mongoose.Schema(
     productCount: {
       type: Number,
       default: 0,
+      min: [0, "Product count cannot be negative"],
     },
   },
   {
@@ -128,28 +147,36 @@ categorySchema.virtual("ancestors").get(function () {
  * Pre save hook to generate slug and path
  */
 
-categorySchema.pre("save", async function () {
-  //Generating slug from name if not provided
-  if (this.isModified("name") && !this.slug) {
+categorySchema.pre("save", async function (next) {
+  // 1. Ensure slug exists
+  if (this.isModified("name") || !this.slug) {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
 
-  //Build Path and set level
-  if (this.isModified("parent") || this.isNew) {
+  // 2. Handle Path/Level for NEW docs OR Parent/Slug changes
+  if (this.isNew || this.isModified("parent") || this.isModified("slug")) {
+    const oldPath = this.path;
+    const oldLevel = this.level;
+
+    // Calculate new Path and Level
     if (this.parent) {
-      //find parent to build path
       const parent = await mongoose.model("Category").findById(this.parent);
-      if (!parent) {
-        throw new Error("Parent category not found");
-      }
+      if (!parent) throw new Error("Parent category not found");
+
       this.path = `${parent.path}/${this.slug}`;
       this.level = parent.level + 1;
     } else {
-      //Root category
       this.path = this.slug;
-      this.level = o;
+      this.level = 0;
+    }
+
+    // 3. If updating an existing doc, update all descendants
+    if (!this.isNew && oldPath && oldPath !== this.path) {
+      // Pass the new Level and old Level to calculate the shift
+      await this.updateDescendantPaths(this.path, this.level, oldLevel);
     }
   }
+  next();
 });
 
 /**
@@ -157,11 +184,15 @@ categorySchema.pre("save", async function () {
  * @param {String} categoryPath - Category path
  * @returns {Promise<Array>} Array of descendants categories
  */
-categorySchema.static.findDescendants = function (categoryPath) {
-  return this.find({
-    path: new RegExp(`^${categoryPath}/`), //regex starts with path
-    isActive: true,
-  }).sort({ path: 1 });
+categorySchema.statics.findDescendants = function (categoryPath) {
+  try {
+    return this.find({
+      path: new RegExp(`^${categoryPath}/`), //regex starts with path
+      isActive: true,
+    }).sort({ path: 1 });
+  } catch (error) {
+    throw new Error(`Error finding descendants: ${error.message}`);
+  }
 };
 
 /**
@@ -170,19 +201,27 @@ categorySchema.static.findDescendants = function (categoryPath) {
  * @returns {Promise<Array>} Array of child categories
  */
 
-categorySchema.static.findChildren = function (parentId) {
-  return this.find({ parent: parentId, isActive: true }).sort({
-    order: 1,
-    name: 1,
-  });
+categorySchema.statics.findChildren = function (parentId) {
+  try {
+    return this.find({ parent: parentId, isActive: true }).sort({
+      order: 1,
+      name: 1,
+    });
+  } catch (error) {
+    throw new Error(`Error finding children: ${error.message}`);
+  }
 };
 
 /**
  * static : find root category (level 0)
  * @returns {Promise<Array>} Array of root categories
  */
-categorySchema.static.findRoots = function () {
-  return this.find({ level: 0, isActive: true }).sort({ order: 1, name: 1 });
+categorySchema.statics.findRoots = function () {
+  try {
+    return this.find({ level: 0, isActive: true }).sort({ order: 1, name: 1 });
+  } catch (error) {
+    throw new Error(`Error finding roots: ${error.message}`);
+  }
 };
 
 /**
@@ -192,14 +231,23 @@ categorySchema.static.findRoots = function () {
 categorySchema.methods.getAncestorTree = async function () {
   if (this.level === 0) return [];
 
-  const ancestorPaths = this.ancestors;
-  const ancestors = [];
+  try {
+    const ancestorSlugs = this.ancestors; // ["electronics", "phones"]
+    const ancestorPaths = ancestorSlugs.map((_, i) =>
+      ancestorSlugs.slice(0, i + 1).join("/"),
+    ); // ["electronics", "electronics/phones"]
 
-  for (const path of ancestorPaths) {
-    const category = await mongoose.model("Category").findOne({ path });
-    if (category) ancestors.push(category);
+    const ancestors = await mongoose
+      .model("Category")
+      .find({
+        path: { $in: ancestorPaths },
+      })
+      .sort({ level: 1 });
+
+    return ancestors;
+  } catch (error) {
+    throw new Error(`Error getting ancestor tree: ${error.message}`);
   }
-  return ancestors;
 };
 
 /**
@@ -207,20 +255,31 @@ categorySchema.methods.getAncestorTree = async function () {
  * Expensive Operation - user sparingly
  * @param {String} newPath - New path for this category
  */
-categorySchema.methods.updateDescendantPaths = async function (newPath) {
+categorySchema.methods.updateDescendantPaths = async function (
+  newPath,
+  newLevel,
+  oldLevel,
+) {
   const oldPath = this.path;
-  const descendants = await mongoose.model("Category").findDescendants(oldPath);
+  const levelOffset = newLevel - oldLevel; // How much levels shifted
 
-  //update all descendants paths
-  const bulkOps = descendants.map((desc) => ({
-    updatePne: {
-      filter: { _id: desc._id },
-      update: {
-        path: desc.path.replace(oldPath, newPath),
-        level: desc.level + (this.level - desc.level),
+  // Find descendants using the static method you already wrote
+  const descendants = await mongoose.model("Category").find({
+    path: new RegExp(`^${oldPath}/`),
+  });
+
+  const bulkOps = descendants.map((desc) => {
+    const updatedPath = desc.path.replace(oldPath, newPath);
+    return {
+      updateOne: {
+        filter: { _id: desc._id },
+        update: {
+          path: updatedPath,
+          level: desc.level + levelOffset, // Correctly shifts level
+        },
       },
-    },
-  }));
+    };
+  });
 
   if (bulkOps.length > 0) {
     await mongoose.model("Category").bulkWrite(bulkOps);
@@ -232,29 +291,33 @@ categorySchema.methods.updateDescendantPaths = async function (newPath) {
  * @param {ObjectId} rootId - Root category ID (optional)
  * @returns {Promise<Array>} Nested category tree
  */
-categorySchema.static.getTree = async function (rootId = null) {
-  const query = rootId ? { parent: rootId } : { level: 0 };
-  const categories = await this.find({ ...query, isActive: true }).sort({
-    order: 1,
-    name: 1,
-  });
+categorySchema.statics.getTree = async function (rootId = null) {
+  try {
+    const query = rootId ? { parent: rootId } : { level: 0 };
+    const categories = await this.find({ ...query, isActive: true }).sort({
+      order: 1,
+      name: 1,
+    });
 
-  //Recursive function to build tree
-  const buildTree = async (category) => {
-    const children = await this.find({
-      parent: category._id,
-      isActive: true,
-    }).sort({ order: 1 });
-    const categoryObj = category.toObject();
+    //Recursive function to build tree
+    const buildTree = async (category) => {
+      const children = await this.find({
+        parent: category._id,
+        isActive: true,
+      }).sort({ order: 1 });
+      const categoryObj = category.toObject();
 
-    if (children.length > 0) {
-      categoryObj.children = await Promise.all(
-        children.map((child) => buildTree(child)),
-      );
-    }
-    return categoryObj;
-  };
-  return await Promise.all(categories.map((cat) => buildTree(cat)));
+      if (children.length > 0) {
+        categoryObj.children = await Promise.all(
+          children.map((child) => buildTree(child)),
+        );
+      }
+      return categoryObj;
+    };
+    return await Promise.all(categories.map((cat) => buildTree(cat)));
+  } catch (error) {
+    throw new Error(`Error getting tree: ${error.message}`);
+  }
 };
 
 const Category = mongoose.model("Category", categorySchema);

@@ -43,8 +43,20 @@ class ApiGateway {
       }),
     );
 
-    this.app.use(express.json({ limit: "10mb" }));
-    this.app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+    // DON'T parse body for API routes - they get proxied
+    this.app.use((req, res, next) => {
+      if (req.path.startsWith("/api/")) {
+        return next();
+      }
+      express.json({ limit: "10mb" })(req, res, next);
+    });
+
+    this.app.use((req, res, next) => {
+      if (req.path.startsWith("/api/")) {
+        return next();
+      }
+      express.urlencoded({ extended: true, limit: "10mb" })(req, res, next);
+    });
 
     this.app.use(requestIdMiddleware);
     this.app.use(rateLimiter);
@@ -75,12 +87,20 @@ class ApiGateway {
       });
     });
 
-    this.app.use("/api/auth", strictRateLimiter);
-
     const routes = proxyHandler.getRoutes();
     routes.forEach(({ path, service }) => {
       logger.info(`Registering proxy route: ${path} -> ${service}`);
-      this.app.use(path, proxyHandler.createProxy(service, path));
+
+      // ONLY THIS CODE - NO LINE BEFORE THE IF/ELSE!
+      if (path === "/api/auth") {
+        this.app.use(
+          path,
+          strictRateLimiter,
+          proxyHandler.createProxy(service, path),
+        );
+      } else {
+        this.app.use(path, proxyHandler.createProxy(service, path));
+      }
     });
 
     this.app.use((req, res) => {

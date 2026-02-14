@@ -45,8 +45,10 @@ class ProxyHandler {
     return createProxyMiddleware({
       target,
       changeOrigin: true,
+
+      // FIX: Only remove /api prefix, keep service-specific paths
       pathRewrite: {
-        [`^${pathPrefix}`]: "",
+        "^/api": "", // /api/auth/register -> /auth/register
       },
 
       onProxyReq: (proxyReq, req, res) => {
@@ -65,7 +67,9 @@ class ProxyHandler {
         proxyReq.setHeader("X-Request-Id", res.locals.requestId);
         proxyReq.setHeader("X-Forwarded-For", req.ip);
 
-        logger.debug(`Proxying ${req.method} ${req.path} to ${serviceName}`);
+        logger.debug(
+          `Proxying ${req.method} ${req.path} to ${serviceName} at ${target}`,
+        );
       },
 
       onProxyRes: (proxyRes, req, res) => {
@@ -80,18 +84,20 @@ class ProxyHandler {
         logger.error(`Proxy error for ${serviceName}:`, err.message);
         this.recordFailure(serviceName);
 
-        res.status(502).json({
-          success: false,
-          error: {
-            code: "BAD_GATEWAY",
-            message: `Unable to reach ${serviceName} service`,
-            details: config.isDevelopment ? err.message : null,
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            requestId: res.locals.requestId,
-          },
-        });
+        if (!res.headersSent) {
+          res.status(502).json({
+            success: false,
+            error: {
+              code: "BAD_GATEWAY",
+              message: `Unable to reach ${serviceName} service`,
+              details: config.isDevelopment ? err.message : null,
+            },
+            metadata: {
+              timestamp: new Date().toISOString(),
+              requestId: res.locals.requestId,
+            },
+          });
+        }
       },
 
       proxyTimeout: 30000,

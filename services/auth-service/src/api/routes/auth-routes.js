@@ -8,21 +8,10 @@ import {
   validatePasswordChange,
   validateProfileUpdate,
 } from "../middlewares/validate.js";
-
 const router = express.Router();
-
-/**
- * Authentication Routes
- * All routes are prefixed with /auth from main app
- */
-
-
-//public routes (no authentication required)
 router.post("/register", validateRegister, authController.register);
 router.post("/login", validateLogin, authController.login);
 router.post("/refresh", validateRefreshToken, authController.refreshToken);
-
-//Protected routes (authentication required)
 router.post("/logout", authenticate, authController.logout);
 router.post("/logout-all", authenticate, authController.logoutAll);
 router.get("/me", authenticate, authController.getCurrentUser);

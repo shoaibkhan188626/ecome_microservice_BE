@@ -6,6 +6,9 @@ import {
   createLogger,
   requestIdMiddleware,
   createErrorHandler,
+  initTracing,
+  shutdownTracing,
+  initBusinessMetrics,
 } from "@ecommerce/common";
 import healthRoutes, {
   dbConnection,
@@ -25,6 +28,7 @@ const logger = createLogger(
 class InventoryServiceApp {
   constructor() {
     this.app = express();
+    this.server = null; // ADDED: Store server instance for graceful shutdown
     this.lockManager = null;
     this.inventoryService = null;
     this.inventoryController = null;
@@ -64,14 +68,18 @@ class InventoryServiceApp {
         service: "Inventory Service",
         version: "1.0.0",
         status: "operational",
+        features: {
+          observability: "OpenTelemetry + Prometheus", // ADDED
+        },
         endpoints: {
           health: "/health",
-          inventory: "GET /api/inventory/:sku",
-          reserve: "POST /api/inventory/reserve",
-          release: "POST /api/inventory/release",
-          commit: "POST /api/inventory/commit",
-          adjust: "POST /api/inventory/adjust",
-          lowStock: "GET /api/inventory/low-stock",
+          inventory: "GET /inventory/:sku",
+          reserve: "POST /inventory/reserve",
+          release: "POST /inventory/release",
+          commit: "POST /inventory/commit",
+          adjust: "POST /inventory/adjust",
+          lowStock: "GET /inventory/low-stock",
+          metrics: "GET /metrics", // ADDED
         },
       });
     });
@@ -82,7 +90,7 @@ class InventoryServiceApp {
     this.inventoryController = new InventoryController(this.inventoryService);
 
     const inventoryRoutes = createInventoryRoutes(this.inventoryController);
-    this.app.use("/api/inventory", inventoryRoutes);
+    this.app.use("/inventory", inventoryRoutes);
 
     this.app.use((req, res) => {
       res.status(404).json({
@@ -105,37 +113,65 @@ class InventoryServiceApp {
 
   async start() {
     try {
-      await dbConnection.connect(config.mongoUri);
-      redisClient.connect(config.redisUrl);
+      // ADDED: Initialize OpenTelemetry FIRST (before DB/Redis connections)
+      const metricsPort = parseInt(config.port) + 1000; // 3003 -> 4003
+      initTracing("inventory-service", metricsPort);
+      initBusinessMetrics();
 
-      this.app.listen(config.port, () => {
-        logger.info(`Inventory Service running on port ${config.port}`);
-        logger.info(`Environment: ${config.nodeEnv}`);
-        logger.info(`process ID :${process.pid}`);
+      await dbConnection.connect(config.mongoUri);
+      await redisClient.connect(config.redisUrl);
+
+      // ADDED: Store server instance
+      this.server = this.app.listen(config.port, () => {
+        logger.info(`✅ Inventory Service running on port ${config.port}`);
+        logger.info(
+          `📊 Metrics available at http://localhost:${metricsPort}/metrics`,
+        );
+        logger.info(`🔧 Environment: ${config.nodeEnv}`);
+        logger.info(`🆔 Process ID: ${process.pid}`);
       });
     } catch (error) {
       logger.error("Failed to start server:", error);
       process.exit(1);
     }
   }
+
+  // ADDED: Graceful shutdown method
+  async stop() {
+    logger.info("🛑 Stopping Inventory Service...");
+    try {
+      await shutdownTracing(); // ADDED: Shutdown OpenTelemetry
+
+      if (this.server) {
+        await new Promise((resolve) => this.server.close(resolve));
+        logger.info("HTTP server closed");
+      }
+
+      await redisClient.disconnect();
+      logger.info("Redis disconnected");
+
+      await dbConnection.disconnect();
+      logger.info("Database disconnected");
+    } catch (e) {
+      logger.error("Error during shutdown:", e);
+    }
+    process.exit(0);
+  }
 }
 
 const inventoryService = new InventoryServiceApp();
 inventoryService.start();
 
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received. Shutting down gracefully...");
-  await dbConnection.disconnect();
-  await redisClient.disconnect();
-  process.exit(0);
-});
+// UPDATED: Use stop() method for graceful shutdown
+process.on("SIGTERM", () => inventoryService.stop());
+process.on("SIGINT", () => inventoryService.stop()); // ADDED: Handle Ctrl+C
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught Exception:", err);
-  process.exit(1);
+  inventoryService.stop(); // UPDATED: Call stop() instead of immediate exit
 });
 
 process.on("unhandledRejection", (reason, promise) => {
-  logger.error("unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+  logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+  inventoryService.stop(); // UPDATED: Call stop() instead of immediate exit
 });

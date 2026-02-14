@@ -38,17 +38,19 @@ export const strictRateLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  // Also add validation here to be safe
   validate: { xForwardedForHeader: false },
-  handler: (req, res) => {
-    logger.warn(`Strict rate limit exceeded for IP : ${req.ip}`);
-    ResponseHandler.error(
-      res,
-      "RATE_LIMIT_EXCEEDED",
-      "Too many failed attempts",
-      429,
-    );
-  },
+  
+  // REMOVE the custom handler - let express-rate-limit handle it
+  // The default behavior will call next() when limit is not exceeded
+  // handler: (req, res) => {
+  //   logger.warn(`Strict rate limit exceeded for IP : ${req.ip}`);
+  //   ResponseHandler.error(
+  //     res,
+  //     "RATE_LIMIT_EXCEEDED",
+  //     "Too many failed attempts",
+  //     429,
+  //   );
+  // },
 });
 
 export default rateLimiter;

@@ -6,6 +6,9 @@ import {
   createLogger,
   requestIdMiddleware,
   createErrorHandler,
+  initTracing,
+  shutdownTracing,
+  initBusinessMetrics,
   OutboxPublisher, // ADDED
 } from "@ecommerce/common";
 import healthRoutes, {
@@ -32,20 +35,21 @@ const logger = createLogger(
  * - Idempotency support
  * - Inventory reservation/commit
  * - Multi-state transitions
- * - RELIABLE EVENT PUBLISHING (Outbox Pattern) // ADDED
+ * - RELIABLE EVENT PUBLISHING (Outbox Pattern)
  *
  * Architecture:
  * - Domain-driven design
  * - Separation of concerns
  * - Atomic operations with transactions
- * - Guaranteed event delivery // ADDED
+ * - Guaranteed event delivery
  */
 class OrderServiceApp {
   constructor() {
     this.app = express();
+    this.server = null; // ADDED: Store server instance for graceful shutdown
     this.orderService = null;
     this.orderController = null;
-    this.outboxPublisher = null; // ADDED
+    this.outboxPublisher = null;
     this.setupMiddlewares();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -84,22 +88,24 @@ class OrderServiceApp {
         version: "1.0.0",
         status: "operational",
         features: {
+          observability: "OpenTelemetry + Prometheus", // ADDED
           stateMachine: "Workflow-based order processing",
           cqrs: "Command/Query separation",
           eventSourcing: "Complete state history",
           idempotency: "Duplicate request protection",
-          outboxPattern: "Guaranteed event delivery", // ADDED
+          outboxPattern: "Guaranteed event delivery",
         },
         endpoints: {
           health: "/health",
-          createOrder: "POST /api/orders",
-          myOrders: "GET /api/orders/my-orders",
-          orderDetails: "GET /api/orders/:orderId",
-          processPayment: "POST /api/orders/:orderId/payment",
-          cancelOrder: "POST /api/orders/:orderId/cancel",
-          orderHistory: "GET /api/orders/:orderId/history",
-          adminOrders: "GET /api/orders (admin)",
-          shipOrder: "POST /api/orders/:orderId/ship (admin)",
+          createOrder: "POST /orders",
+          myOrders: "GET /orders/my-orders",
+          orderDetails: "GET /orders/:orderId",
+          processPayment: "POST /orders/:orderId/payment",
+          cancelOrder: "POST /orders/:orderId/cancel",
+          orderHistory: "GET /orders/:orderId/history",
+          adminOrders: "GET /orders (admin)",
+          shipOrder: "POST /orders/:orderId/ship (admin)",
+          metrics: "GET /metrics", // ADDED
         },
       });
     });
@@ -109,7 +115,7 @@ class OrderServiceApp {
     this.orderController = new OrderController(this.orderService);
 
     const orderRoutes = createOrderRoutes(this.orderController);
-    this.app.use("/api/orders", orderRoutes);
+    this.app.use("/orders", orderRoutes);
 
     // 404 handler
     this.app.use((req, res) => {
@@ -133,11 +139,16 @@ class OrderServiceApp {
 
   async start() {
     try {
+      // ADDED: Initialize OpenTelemetry FIRST (before DB/Redis connections)
+      const metricsPort = parseInt(config.port) + 1000; // 3005 -> 4005
+      initTracing("order-service", metricsPort);
+      initBusinessMetrics();
+
       // Connect to databases
       await dbConnection.connect(config.mongoUri);
-      redisClient.connect(config.redisUrl);
+      await redisClient.connect(config.redisUrl);
 
-      // START OUTBOX PUBLISHER (ADDED)
+      // START OUTBOX PUBLISHER
       this.outboxPublisher = new OutboxPublisher({
         rabbitmqUrl: config.rabbitmqUrl,
         exchange: "order.events",
@@ -148,14 +159,17 @@ class OrderServiceApp {
       await this.outboxPublisher.start();
       logger.info("📮 Outbox Publisher started");
 
-      // Start HTTP server
+      // ADDED: Store server instance
       this.server = this.app.listen(config.port, () => {
-        logger.info(`🚀 Order Service running on port ${config.port}`);
-        logger.info(`📊 Environment: ${config.nodeEnv}`);
-        logger.info(`👷 Process ID: ${process.pid}`);
+        logger.info(`✅ Order Service running on port ${config.port}`);
+        logger.info(
+          `📊 Metrics available at http://localhost:${metricsPort}/metrics`,
+        );
+        logger.info(`🔧 Environment: ${config.nodeEnv}`);
+        logger.info(`🆔 Process ID: ${process.pid}`);
         logger.info(`🔄 State Machine: Enabled`);
         logger.info(`📝 Event Sourcing: Active`);
-        logger.info(`📮 Outbox Pattern: Active`); // ADDED
+        logger.info(`📮 Outbox Pattern: Active`);
       });
     } catch (error) {
       logger.error("Failed to start server:", error);
@@ -165,26 +179,29 @@ class OrderServiceApp {
 
   // ADDED: Graceful shutdown method
   async stop() {
-    logger.info("Shutting down gracefully...");
+    logger.info("🛑 Stopping Order Service...");
+    try {
+      await shutdownTracing(); // ADDED: Shutdown OpenTelemetry
 
-    // Stop accepting new connections
-    if (this.server) {
-      this.server.close(() => {
+      if (this.server) {
+        await new Promise((resolve) => this.server.close(resolve));
         logger.info("HTTP server closed");
-      });
+      }
+
+      // Stop outbox publisher
+      if (this.outboxPublisher) {
+        await this.outboxPublisher.stop();
+        logger.info("Outbox publisher stopped");
+      }
+
+      await redisClient.disconnect();
+      logger.info("Redis disconnected");
+
+      await dbConnection.disconnect();
+      logger.info("Database disconnected");
+    } catch (e) {
+      logger.error("Error during shutdown:", e);
     }
-
-    // Stop outbox publisher
-    if (this.outboxPublisher) {
-      await this.outboxPublisher.stop();
-      logger.info("Outbox publisher stopped");
-    }
-
-    // Disconnect databases
-    await dbConnection.disconnect();
-    await redisClient.disconnect();
-    logger.info("Database connections closed");
-
     process.exit(0);
   }
 }
@@ -192,23 +209,16 @@ class OrderServiceApp {
 const orderService = new OrderServiceApp();
 orderService.start();
 
-// UPDATED: Graceful shutdown handlers
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received");
-  await orderService.stop();
-});
-
-process.on("SIGINT", async () => {
-  logger.info("SIGINT received");
-  await orderService.stop();
-});
+// UPDATED: Use stop() method for graceful shutdown
+process.on("SIGTERM", () => orderService.stop());
+process.on("SIGINT", () => orderService.stop()); // ADDED: Handle Ctrl+C
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught Exception:", err);
-  orderService.stop().then(() => process.exit(1));
+  orderService.stop(); // UPDATED: Call stop() instead of immediate exit
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  orderService.stop().then(() => process.exit(1));
+  orderService.stop(); // UPDATED: Call stop() instead of immediate exit
 });

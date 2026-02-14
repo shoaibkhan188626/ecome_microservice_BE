@@ -7,6 +7,9 @@ import {
   createLogger,
   requestIdMiddleware,
   createErrorHandler,
+  initTracing,
+  shutdownTracing,
+  initBusinessMetrics,
 } from "@ecommerce/common";
 import healthRoutes, {
   dbConnection,
@@ -25,6 +28,7 @@ const logger = createLogger(
 class CartServiceApp {
   constructor() {
     this.app = express();
+    this.server = null; // ADDED: Store server instance for graceful shutdown
     this.cartService = null;
     this.cartController = null;
     this.setupMiddlewares();
@@ -65,16 +69,20 @@ class CartServiceApp {
         service: "Cart Service",
         version: "1.0.0",
         status: "operational",
+        features: {
+          observability: "OpenTelemetry + Prometheus", // ADDED
+        },
         endpoints: {
           health: "/health",
-          cart: "GET /api/cart",
-          addItem: "POST /api/cart/items",
-          updateItem: "PUT /api/cart/items/:productId",
-          removeItem: "DELETE /api/cart/items/:productId",
-          clearCart: "DELETE /api/cart",
-          mergeCart: "POST /api/cart/merge",
-          validateCart: "POST /api/cart/validate",
-          itemCount: "GET /api/cart/count",
+          cart: "GET /cart",
+          addItem: "POST /cart/items",
+          updateItem: "PUT /cart/items/:productId",
+          removeItem: "DELETE /cart/items/:productId",
+          clearCart: "DELETE /cart",
+          mergeCart: "POST /cart/merge",
+          validateCart: "POST /cart/validate",
+          itemCount: "GET /cart/count",
+          metrics: "GET /metrics", // ADDED
         },
       });
     });
@@ -84,7 +92,7 @@ class CartServiceApp {
     this.cartController = new CartController(this.cartService);
 
     const cartRoutes = createCartRoutes(this.cartController);
-    this.app.use("/api/cart", cartRoutes);
+    this.app.use("/cart", cartRoutes);
 
     this.app.use((req, res) => {
       res.status(404).json({
@@ -107,37 +115,65 @@ class CartServiceApp {
 
   async start() {
     try {
-      await dbConnection.connect(config.mongoUri);
-      redisClient.connect(config.redisUrl);
+      // ADDED: Initialize OpenTelemetry FIRST (before DB connections)
+      const metricsPort = parseInt(config.port) + 1000; // 3004 -> 4004
+      initTracing("cart-service", metricsPort);
+      initBusinessMetrics();
 
-      this.app.listen(config.port, () => {
-        logger.info(`cart service running on port ${config.port}`);
-        logger.info(`environment : ${config.nodeEnv}`);
-        logger.info(`process ID: ${process.pid}`);
+      await dbConnection.connect(config.mongoUri);
+      await redisClient.connect(config.redisUrl);
+
+      // ADDED: Store server instance
+      this.server = this.app.listen(config.port, () => {
+        logger.info(`✅ Cart Service running on port ${config.port}`);
+        logger.info(
+          `📊 Metrics available at http://localhost:${metricsPort}/metrics`,
+        );
+        logger.info(`🔧 Environment: ${config.nodeEnv}`);
+        logger.info(`🆔 Process ID: ${process.pid}`);
       });
     } catch (error) {
       logger.error("Failed to start server:", error);
       process.exit(1);
     }
   }
+
+  // ADDED: Graceful shutdown method
+  async stop() {
+    logger.info("🛑 Stopping Cart Service...");
+    try {
+      await shutdownTracing(); // ADDED: Shutdown OpenTelemetry
+
+      if (this.server) {
+        await new Promise((resolve) => this.server.close(resolve));
+        logger.info("HTTP server closed");
+      }
+
+      await redisClient.disconnect();
+      logger.info("Redis disconnected");
+
+      await dbConnection.disconnect();
+      logger.info("Database disconnected");
+    } catch (e) {
+      logger.error("Error during shutdown:", e);
+    }
+    process.exit(0);
+  }
 }
 
 const cartService = new CartServiceApp();
 cartService.start();
 
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received. Shutting down gracefully...");
-  await dbConnection.disconnect();
-  await redisClient.disconnect();
-  process.exit(0);
-});
+// UPDATED: Use stop() method for graceful shutdown
+process.on("SIGTERM", () => cartService.stop());
+process.on("SIGINT", () => cartService.stop()); // ADDED: Handle Ctrl+C
 
 process.on("uncaughtException", (err) => {
-  logger.error("uncaught exception:", err);
-  process.exit(1);
+  logger.error("Uncaught Exception:", err);
+  cartService.stop(); // UPDATED: Call stop() instead of immediate exit
 });
 
 process.on("unhandledRejection", (reason, promise) => {
-  logger.error("Unhandled Rejection at :", promise, "reason:", reason);
-  process.exit(1);
+  logger.error("Unhandled Rejection at:", promise, "reason:", reason);
+  cartService.stop(); // UPDATED: Call stop() instead of immediate exit
 });

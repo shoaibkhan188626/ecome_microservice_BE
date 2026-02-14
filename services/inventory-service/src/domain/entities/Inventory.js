@@ -164,7 +164,7 @@ inventorySchema.virtual("stockStatus").get(function () {
  * virtual : need reorder
  */
 
-inventorySchema.static.findByProduct = function (productId, warehouse = null) {
+inventorySchema.statics.findByProduct = function (productId, warehouse = null) {
   const query = { productId, isActive: true };
 
   if (warehouse) query.warehouse = warehouse;
@@ -175,14 +175,14 @@ inventorySchema.static.findByProduct = function (productId, warehouse = null) {
 /**
  * static : Find by SKU
  */
-inventorySchema.static.findBySKU = function (sku, warehouse = "main") {
+inventorySchema.statics.findBySKU = function (sku, warehouse = "main") {
   return this.findOne({ sku, warehouse, isActive: true });
 };
 
 /**
  * Static : Find low stock items
  */
-inventorySchema.static.findLowStock = function (warehouse = null) {
+inventorySchema.statics.findLowStock = function (warehouse = null) {
   const query = {
     $expr: { $lte: ["$quantity", "$lowStockThreshold"] },
     isActive: true,
@@ -223,7 +223,7 @@ inventorySchema.methods.canFulFill = function (requestedQty) {
  * @param {String} reservationId - Unique reservation identifier
  * @returns {Promise<Object>} Updated inventory or null if failed
  */
-inventorySchema.static.reserveStock = async function (
+inventorySchema.statics.reserveStock = async function (
   sku,
   quantity,
   reservationId,
@@ -252,7 +252,7 @@ inventorySchema.static.reserveStock = async function (
  * @returns {Promise<Object>} Updated inventory
  */
 
-inventorySchema.static.releaseReservation = async function (sku, quantity) {
+inventorySchema.statics.releaseReservation = async function (sku, quantity) {
   return await this.findOneAndUpdate(
     { sku, isActive: true },
     { $inc: { reserved: -quantity } },
@@ -269,7 +269,7 @@ inventorySchema.static.releaseReservation = async function (sku, quantity) {
  * @returns {Promise<Object>} Updated inventory
  */
 
-inventorySchema.static.commitReservation = async function (sku, quantity) {
+inventorySchema.statics.commitReservation = async function (sku, quantity) {
   return await this.findOneAndUpdate(
     {
       sku,
@@ -297,7 +297,7 @@ inventorySchema.static.commitReservation = async function (sku, quantity) {
  * @returns {Promise<Object>} Updated inventory
  */
 
-inventorySchema.static.adjustStock = async function (
+inventorySchema.statics.adjustStock = async function (
   sku,
   quantity,
   reason = "manual",

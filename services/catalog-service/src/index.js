@@ -6,6 +6,9 @@ import {
   createLogger,
   requestIdMiddleware,
   createErrorHandler,
+  initTracing,
+  shutdownTracing,
+  initBusinessMetrics,
 } from "@ecommerce/common";
 import healthRoutes, { dbConnection } from "./api/routes/health-routes.js";
 import apiRoutes from "./api/routes/index.js";
@@ -19,6 +22,7 @@ const logger = createLogger(
 class CatalogService {
   constructor() {
     this.app = express();
+    this.server = null; // ADDED: Store server instance for graceful shutdown
     this.setupMiddlewares();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -58,19 +62,23 @@ class CatalogService {
         service: "Catalog Service",
         version: "1.0.0",
         status: "operational",
+        features: {
+          observability: "OpenTelemetry + Prometheus", // ADDED
+        },
         endpoints: {
           health: "/health",
-          categories: "GET /api/categories",
-          categoryTree: "GET /api/categories/tree",
-          products: "GET /api/products",
-          productsByCategory: "GET /api/categories/:id/products",
-          search: "GET /api/products/search?q=keyword",
-          featured: "GET /api/products/featured",
+          categories: "GET /categories",
+          categoryTree: "GET /categories/tree",
+          products: "GET /products",
+          productsByCategory: "GET /categories/:id/products",
+          search: "GET /products/search?q=keyword",
+          featured: "GET /products/featured",
+          metrics: "GET /metrics", // ADDED
         },
       });
     });
 
-    this.app.use("/api", apiRoutes);
+    this.app.use("/", apiRoutes);
 
     this.app.use((req, res) => {
       res.status(404).json({
@@ -93,35 +101,61 @@ class CatalogService {
 
   async start() {
     try {
+      // ADDED: Initialize OpenTelemetry FIRST (before DB connections)
+      const metricsPort = parseInt(config.port) + 1000; // 3002 -> 4002
+      initTracing("catalog-service", metricsPort);
+      initBusinessMetrics();
+
       await dbConnection.connect(config.mongoUri);
 
-      this.app.listen(config.port, () => {
-        logger.info(`🚀 Catalog Service running on port ${config.port}`);
-        logger.info(`📊 Environment: ${config.nodeEnv}`);
-        logger.info(`👷 Process ID: ${process.pid}`);
+      // ADDED: Store server instance
+      this.server = this.app.listen(config.port, () => {
+        logger.info(`✅ Catalog Service running on port ${config.port}`);
+        logger.info(
+          `📊 Metrics available at http://localhost:${metricsPort}/metrics`,
+        );
+        logger.info(`🔧 Environment: ${config.nodeEnv}`);
+        logger.info(`🆔 Process ID: ${process.pid}`);
       });
     } catch (error) {
       logger.error("Failed to start server:", error);
       process.exit(1);
     }
   }
+
+  // ADDED: Graceful shutdown method
+  async stop() {
+    logger.info("🛑 Stopping Catalog Service...");
+    try {
+      await shutdownTracing(); // ADDED: Shutdown OpenTelemetry
+
+      if (this.server) {
+        await new Promise((resolve) => this.server.close(resolve));
+        logger.info("HTTP server closed");
+      }
+
+      await dbConnection.disconnect();
+      logger.info("Database disconnected");
+    } catch (e) {
+      logger.error("Error during shutdown:", e);
+    }
+    process.exit(0);
+  }
 }
 
 const catalogService = new CatalogService();
 catalogService.start();
 
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received. Shutting down gracefully...");
-  await dbConnection.disconnect();
-  process.exit(0);
-});
+// UPDATED: Use stop() method for graceful shutdown
+process.on("SIGTERM", () => catalogService.stop());
+process.on("SIGINT", () => catalogService.stop()); // ADDED: Handle Ctrl+C
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught Exception:", err);
-  process.exit(1);
+  catalogService.stop(); // UPDATED: Call stop() instead of immediate exit
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+  catalogService.stop(); // UPDATED: Call stop() instead of immediate exit
 });

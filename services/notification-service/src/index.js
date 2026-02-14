@@ -7,6 +7,9 @@ import {
   createLogger,
   requestIdMiddleware,
   createErrorHandler,
+  initTracing,
+  shutdownTracing,
+  initBusinessMetrics,
 } from "@ecommerce/common";
 import healthRoutes, { dbConnection } from "./api/routes/health-routes.js";
 import notificationRoutes from "./api/routes/notification-routes.js";
@@ -21,6 +24,7 @@ const logger = createLogger(
 class NotificationServiceApp {
   constructor() {
     this.app = express();
+    this.server = null; // ADDED: Store server instance for graceful shutdown
     this.setupMiddlewares();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -34,7 +38,7 @@ class NotificationServiceApp {
           ? "*"
           : process.env.ALLOWED_ORIGINS?.split(","),
         credentials: true,
-      })
+      }),
     );
 
     this.app.use(express.json({ limit: "10mb" }));
@@ -61,6 +65,7 @@ class NotificationServiceApp {
         version: "1.0.0",
         status: "operational",
         features: {
+          observability: "OpenTelemetry + Prometheus", // ADDED
           email: "SMTP-based email notifications",
           sms: "Fonoster/Twilio SMS",
           push: "Firebase Cloud Messaging",
@@ -70,15 +75,16 @@ class NotificationServiceApp {
           health: "/health",
           ready: "/ready",
           live: "/live",
-          send: "POST /api/notifications/send (admin)",
-          my: "GET /api/notifications/my",
-          markRead: "PATCH /api/notifications/:id/read",
-          retryFailed: "POST /api/notifications/retry-failed (admin)",
+          send: "POST /notifications/send (admin)",
+          my: "GET /notifications/my",
+          markRead: "PATCH /notifications/:id/read",
+          retryFailed: "POST /notifications/retry-failed (admin)",
+          metrics: "GET /metrics", // ADDED
         },
       });
     });
 
-    this.app.use("/api/notifications", notificationRoutes);
+    this.app.use("/notifications", notificationRoutes);
 
     this.app.use((req, res) => {
       res.status(404).json({
@@ -101,15 +107,24 @@ class NotificationServiceApp {
 
   async start() {
     try {
+      // ADDED: Initialize OpenTelemetry FIRST (before DB/RabbitMQ connections)
+      const metricsPort = parseInt(config.port) + 1000; // 3007 -> 4007
+      initTracing("notification-service", metricsPort);
+      initBusinessMetrics();
+
       await dbConnection.connect(config.mongoUri);
 
       // Start RabbitMQ consumer for event-driven notifications
       await notificationConsumer.start();
 
-      this.app.listen(config.port, () => {
-        logger.info(`🚀 Notification Service running on port ${config.port}`);
-        logger.info(`📊 Environment: ${config.nodeEnv}`);
-        logger.info(`👷 Process ID: ${process.pid}`);
+      // ADDED: Store server instance
+      this.server = this.app.listen(config.port, () => {
+        logger.info(`✅ Notification Service running on port ${config.port}`);
+        logger.info(
+          `📊 Metrics available at http://localhost:${metricsPort}/metrics`,
+        );
+        logger.info(`🔧 Environment: ${config.nodeEnv}`);
+        logger.info(`🆔 Process ID: ${process.pid}`);
         logger.info(`📬 RabbitMQ consumer: Active`);
       });
     } catch (error) {
@@ -117,24 +132,44 @@ class NotificationServiceApp {
       process.exit(1);
     }
   }
+
+  // ADDED: Graceful shutdown method
+  async stop() {
+    logger.info("🛑 Stopping Notification Service...");
+    try {
+      await shutdownTracing(); // ADDED: Shutdown OpenTelemetry
+
+      if (this.server) {
+        await new Promise((resolve) => this.server.close(resolve));
+        logger.info("HTTP server closed");
+      }
+
+      // Stop RabbitMQ consumer
+      await notificationConsumer.stop();
+      logger.info("RabbitMQ consumer stopped");
+
+      await dbConnection.disconnect();
+      logger.info("Database disconnected");
+    } catch (e) {
+      logger.error("Error during shutdown:", e);
+    }
+    process.exit(0);
+  }
 }
 
 const notificationServiceApp = new NotificationServiceApp();
 notificationServiceApp.start();
 
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received. Shutting down gracefully...");
-  await notificationConsumer.stop();
-  await dbConnection.disconnect();
-  process.exit(0);
-});
+// UPDATED: Use stop() method for graceful shutdown
+process.on("SIGTERM", () => notificationServiceApp.stop());
+process.on("SIGINT", () => notificationServiceApp.stop()); // ADDED: Handle Ctrl+C
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught Exception:", err);
-  process.exit(1);
+  notificationServiceApp.stop(); // UPDATED: Call stop() instead of immediate exit
 });
 
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+  notificationServiceApp.stop(); // UPDATED: Call stop() instead of immediate exit
 });

@@ -464,6 +464,279 @@ class OrderService {
 
     return rates[method] || rates.standard;
   }
+
+  /**
+   * Get user's orders (QUERY)
+   */
+  async getUserOrders(userId, options = {}) {
+    try {
+      const {
+        status,
+        page = 1,
+        limit = 20,
+        sort = "createdAt",
+        order = "desc",
+      } = options;
+
+      const query = { userId };
+
+      if (status) {
+        query.status = status;
+      }
+
+      const skip = (page - 1) * limit;
+      const sortObj = { [sort]: order === "desc" ? -1 : 1 };
+
+      const [orders, total] = await Promise.all([
+        Order.find(query).sort(sortObj).skip(skip).limit(limit).lean(),
+        Order.countDocuments(query),
+      ]);
+
+      return {
+        orders,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
+          hasPrev: page > 1,
+        },
+      };
+    } catch (error) {
+      logger.error("Get user orders error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all orders (QUERY) - Admin only
+   */
+  async getAllOrders(options = {}) {
+    try {
+      const {
+        status,
+        paymentStatus,
+        page = 1,
+        limit = 20,
+        sort = "createdAt",
+        order = "desc",
+        search,
+      } = options;
+
+      const query = {};
+
+      if (status) {
+        query.status = status;
+      }
+
+      if (paymentStatus) {
+        query.paymentStatus = paymentStatus;
+      }
+
+      if (search) {
+        query.$or = [
+          { orderNumber: { $regex: search, $options: "i" } },
+          { "shippingAddress.email": { $regex: search, $options: "i" } },
+        ];
+      }
+
+      const skip = (page - 1) * limit;
+      const sortObj = { [sort]: order === "desc" ? -1 : 1 };
+
+      const [orders, total] = await Promise.all([
+        Order.find(query).sort(sortObj).skip(skip).limit(limit).lean(),
+        Order.countDocuments(query),
+      ]);
+
+      return {
+        orders,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
+          hasPrev: page > 1,
+        },
+      };
+    } catch (error) {
+      logger.error("Get all orders error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start processing order (COMMAND) - WITH TRANSACTION & OUTBOX
+   */
+  async startProcessing(orderId, performedBy = null) {
+    try {
+      const order = await Order.findById(orderId);
+
+      if (!order) {
+        throw new AppError("Order not found", 404);
+      }
+
+      if (!canTransition(order.status, OrderEvents.START_PROCESSING)) {
+        throw new AppError(
+          `Cannot start processing order in ${order.status} state`,
+          400,
+        );
+      }
+
+      const { result: updatedOrder } =
+        await this.transactionManager.withOutboxEvent(
+          async (session) => {
+            const newState = getNextState(
+              order.status,
+              OrderEvents.START_PROCESSING,
+            );
+            order.transitionTo(
+              newState,
+              OrderEvents.START_PROCESSING,
+              performedBy,
+              "Order processing started",
+            );
+            order.processingStartedAt = new Date();
+
+            await order.save({ session });
+            return order;
+          },
+          {
+            eventType: "order.processing_started",
+            aggregateType: "order",
+            aggregateId: order._id.toString(),
+            payload: {
+              orderId: order._id.toString(),
+              orderNumber: order.orderNumber,
+              userId: order.userId,
+              performedBy,
+              startedAt: new Date().toISOString(),
+            },
+          },
+        );
+
+      logger.info(`Order processing started: ${order.orderNumber}`);
+      return updatedOrder;
+    } catch (error) {
+      logger.error("Start processing error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Ship order (COMMAND) - WITH TRANSACTION & OUTBOX
+   */
+  async shipOrder(orderId, shippingData, performedBy = null) {
+    try {
+      const order = await Order.findById(orderId);
+
+      if (!order) {
+        throw new AppError("Order not found", 404);
+      }
+
+      if (!canTransition(order.status, OrderEvents.SHIP_ORDER)) {
+        throw new AppError(`Cannot ship order in ${order.status} state`, 400);
+      }
+
+      const { result: updatedOrder } =
+        await this.transactionManager.withOutboxEvent(
+          async (session) => {
+            const newState = getNextState(order.status, OrderEvents.SHIP_ORDER);
+            order.transitionTo(
+              newState,
+              OrderEvents.SHIP_ORDER,
+              performedBy,
+              "Order shipped",
+            );
+            order.trackingNumber = shippingData.trackingNumber;
+            order.carrier = shippingData.carrier;
+            order.shippedAt = new Date();
+
+            await order.save({ session });
+            return order;
+          },
+          {
+            eventType: "order.shipped",
+            aggregateType: "order",
+            aggregateId: order._id.toString(),
+            payload: {
+              orderId: order._id.toString(),
+              orderNumber: order.orderNumber,
+              userId: order.userId,
+              trackingNumber: shippingData.trackingNumber,
+              carrier: shippingData.carrier,
+              shippedAt: new Date().toISOString(),
+            },
+          },
+        );
+
+      logger.info(
+        `Order shipped: ${order.orderNumber} - Tracking: ${shippingData.trackingNumber}`,
+      );
+      return updatedOrder;
+    } catch (error) {
+      logger.error("Ship order error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deliver order (COMMAND) - WITH TRANSACTION & OUTBOX
+   */
+  async deliverOrder(orderId, performedBy = null) {
+    try {
+      const order = await Order.findById(orderId);
+
+      if (!order) {
+        throw new AppError("Order not found", 404);
+      }
+
+      if (!canTransition(order.status, OrderEvents.DELIVER_ORDER)) {
+        throw new AppError(
+          `Cannot mark as delivered in ${order.status} state`,
+          400,
+        );
+      }
+
+      const { result: updatedOrder } =
+        await this.transactionManager.withOutboxEvent(
+          async (session) => {
+            const newState = getNextState(
+              order.status,
+              OrderEvents.DELIVER_ORDER,
+            );
+            order.transitionTo(
+              newState,
+              OrderEvents.DELIVER_ORDER,
+              performedBy,
+              "Order delivered",
+            );
+            order.deliveredAt = new Date();
+
+            await order.save({ session });
+            return order;
+          },
+          {
+            eventType: "order.delivered",
+            aggregateType: "order",
+            aggregateId: order._id.toString(),
+            payload: {
+              orderId: order._id.toString(),
+              orderNumber: order.orderNumber,
+              userId: order.userId,
+              deliveredAt: new Date().toISOString(),
+            },
+          },
+        );
+
+      logger.info(`Order delivered: ${order.orderNumber}`);
+      return updatedOrder;
+    } catch (error) {
+      logger.error("Deliver order error:", error);
+      throw error;
+    }
+  }
 }
 
 export default OrderService;

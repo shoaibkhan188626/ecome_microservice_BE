@@ -1,18 +1,5 @@
-import { metrics } from "@opentelemetry/api";
+import { getMeter } from "./tracing.js";
 
-/**
- * Get or create a meter for custom metrics
- */
-const getMeter = (name = "ecommerce") => {
-  return metrics.getMeter(name);
-};
-
-/**
- * Create a counter metric
- * @param {string} name - Metric name
- * @param {string} description - Metric description
- * @returns {Counter}
- */
 export const createCounter = (name, description) => {
   const meter = getMeter();
   return meter.createCounter(name, {
@@ -20,12 +7,6 @@ export const createCounter = (name, description) => {
   });
 };
 
-/**
- * Create an up-down counter (can increase or decrease)
- * @param {string} name - Metric name
- * @param {string} description - Metric description
- * @returns {UpDownCounter}
- */
 export const createUpDownCounter = (name, description) => {
   const meter = getMeter();
   return meter.createUpDownCounter(name, {
@@ -33,13 +14,17 @@ export const createUpDownCounter = (name, description) => {
   });
 };
 
-/**
- * Create a histogram metric
- * @param {string} name - Metric name
- * @param {string} description - Metric description
- * @param {number[]} boundaries - Bucket boundaries
- * @returns {Histogram}
- */
+
+
+// FIXED: Rename this to createGauge
+export const createGauge = (name, description) => {
+  const meter = getMeter();
+  return meter.createObservableGauge(name, {
+    description,
+  });
+};
+
+// ... existing code ...
 export const createHistogram = (
   name,
   description,
@@ -52,57 +37,36 @@ export const createHistogram = (
   });
 };
 
-/**
- * Create a gauge metric (observable)
- * @param {string} name - Metric name
- * @param {string} description - Metric description
- * @param {Function} callback - Callback to observe value
- * @returns {ObservableGauge}
- */
-export const createGauge = (name, description, callback) => {
+export const createObservationGauge = (name, description) => {
   const meter = getMeter();
-  return meter.createObservableGauge(
-    name,
-    {
-      description,
-    },
-    callback,
-  );
+  return meter.createObservationGauge(name, {
+    description,
+  });
 };
 
-// Pre-defined business metrics
 let orderCounter = null;
 let paymentCounter = null;
 let inventoryCounter = null;
 let notificationCounter = null;
 
-/**
- * Initialize business metrics
- */
 export const initBusinessMetrics = () => {
-  orderCounter = createCounter("orders_total", "Total number of orders");
+  orderCounter = createCounter("order_total", "Total number of orders");
   paymentCounter = createCounter("payments_total", "Total number of payments");
   inventoryCounter = createCounter(
     "inventory_operations_total",
     "Total inventory operations",
   );
   notificationCounter = createCounter(
-    "notifications_total",
-    "Total notifications sent",
+    "notification_total",
+    "Total number of notifications sent",
   );
 };
 
-/**
- * Record order event
- */
 export const recordOrder = (status = "created", attributes = {}) => {
   if (!orderCounter) initBusinessMetrics();
   orderCounter.add(1, { status, ...attributes });
 };
 
-/**
- * Record payment event
- */
 export const recordPayment = (
   status = "success",
   provider = "unknown",
@@ -112,9 +76,6 @@ export const recordPayment = (
   paymentCounter.add(1, { status, provider, ...attributes });
 };
 
-/**
- * Record inventory operation
- */
 export const recordInventory = (
   operation = "reserve",
   status = "success",
@@ -124,9 +85,6 @@ export const recordInventory = (
   inventoryCounter.add(1, { operation, status, ...attributes });
 };
 
-/**
- * Record notification sent
- */
 export const recordNotification = (
   type = "email",
   status = "success",
@@ -140,10 +98,9 @@ export default {
   createCounter,
   createUpDownCounter,
   createHistogram,
-  createGauge,
+  createObservationGauge,
   initBusinessMetrics,
   recordOrder,
   recordPayment,
-  recordInventory,
   recordNotification,
 };
