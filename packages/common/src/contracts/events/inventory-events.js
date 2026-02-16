@@ -35,6 +35,20 @@ export function createStockReleasedEvent(reservation, metadata = {}) {
   );
 }
 
+export function createStockDeductedEvent(items, metadata = {}) {
+  return createEvent(
+    EventTypes.STOCK_DEDUCTED,
+    {
+      items: items.map((item) => ({
+        productId: item.productId,
+        variantId: item.variantId || null,
+        quantity: item.quantity,
+      })),
+    },
+    { source: 'inventory-service', ...metadata }
+  );
+}
+
 export function createStockLowEvent(product, currentStock, threshold, metadata = {}) {
   return createEvent(
     EventTypes.STOCK_LOW,

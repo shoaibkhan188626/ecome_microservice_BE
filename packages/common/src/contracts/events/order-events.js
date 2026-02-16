@@ -21,6 +21,17 @@ export function createOrderCreatedEvent(order, metadata = {}) {
   );
 }
 
+export function createOrderConfirmedEvent(order, metadata = {}) {
+  return createEvent(
+    EventTypes.ORDER_CONFIRMED,
+    {
+      orderId: order._id?.toString() || order.id,
+      userId: order.userId,
+    },
+    { source: 'order-service', ...metadata }
+  );
+}
+
 export function createOrderCancelledEvent(order, reason, metadata = {}) {
   return createEvent(
     EventTypes.ORDER_CANCELLED,

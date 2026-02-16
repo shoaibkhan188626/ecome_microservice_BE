@@ -33,3 +33,18 @@ export function createPaymentFailedEvent(payment, error, metadata = {}) {
     { source: 'payment-service', ...metadata }
   );
 }
+
+export function createPaymentRefundedEvent(payment, refund, metadata = {}) {
+  return createEvent(
+    EventTypes.PAYMENT_REFUNDED,
+    {
+      paymentId: payment._id?.toString() || payment.id,
+      refundId: refund._id?.toString() || refund.id,
+      orderId: payment.orderId,
+      userId: payment.userId,
+      amount: refund.amount,
+      reason: refund.reason,
+    },
+    { source: 'payment-service', ...metadata }
+  );
+}
