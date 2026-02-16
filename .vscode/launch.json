@@ -1,7 +1,6 @@
 {
   "version": "0.2.0",
   "configurations": [
-    
     {
       "name": "Debug API Gateway",
       "type": "node",
@@ -21,6 +20,72 @@
       "runtimeExecutable": "node",
       "args": ["--inspect=9230", "src/index.js"],
       "envFile": "${workspaceFolder}/services/auth-service/.env",
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Debug Catalog Service",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/services/catalog-service",
+      "runtimeExecutable": "node",
+      "args": ["--inspect=9231", "src/index.js"],
+      "envFile": "${workspaceFolder}/services/catalog-service/.env",
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Debug Cart Service",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/services/cart-service",
+      "runtimeExecutable": "node",
+      "args": ["--inspect=9232", "src/index.js"],
+      "envFile": "${workspaceFolder}/services/cart-service/.env",
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Debug Order Service",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/services/order-service",
+      "runtimeExecutable": "node",
+      "args": ["--inspect=9233", "src/index.js"],
+      "envFile": "${workspaceFolder}/services/order-service/.env",
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Debug Payment Service",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/services/payment-service",
+      "runtimeExecutable": "node",
+      "args": ["--inspect=9234", "src/index.js"],
+      "envFile": "${workspaceFolder}/services/payment-service/.env",
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Debug Inventory Service",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/services/inventory-service",
+      "runtimeExecutable": "node",
+      "args": ["--inspect=9235", "src/index.js"],
+      "envFile": "${workspaceFolder}/services/inventory-service/.env",
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Debug Notification Service",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/services/notification-service",
+      "runtimeExecutable": "node",
+      "args": ["--inspect=9236", "src/index.js"],
+      "envFile": "${workspaceFolder}/services/notification-service/.env",
       "console": "integratedTerminal",
       "restart": true
     },
