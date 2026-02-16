@@ -26,6 +26,7 @@ const logger = createLogger(
 class ApiGateway {
   constructor() {
     this.app = express();
+    this.server = null;
     this.setupMiddlewares();
     this.setupRoutes();
     this.setupErrorHandling();

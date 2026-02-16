@@ -1,11 +1,32 @@
-{
-    "cSpell.words": [
-        "ecommerce",
-        "Fonoster",
-        "netbanking",
-        "Paise",
-        "RABBITMQ",
-        "semconv",
-        "SEMRESATTRS"
-    ]
+﻿{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.workingDirectories": [
+    "packages/common",
+    "services/api-gateway",
+    "services/auth-service",
+    "services/cart-service",
+    "services/catalog-service",
+    "services/inventory-service",
+    "services/notification-service",
+    "services/order-service",
+    "services/payment-service"
+  ],
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/logs": true,
+    "**/.turbo": true,
+    "**/coverage": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/logs": true,
+    "**/coverage": true,
+    "pnpm-lock.yaml": true,
+    "package-lock.json": true
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell"
 }

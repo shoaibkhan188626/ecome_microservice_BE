@@ -20,7 +20,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@ecommerce/common": "file:../../packages/common",
+    "@ecommerce/common": "workspace:*",
     "@fonoster/sdk": "^0.17.1",
     "axios": "^1.13.4",
     "cookie-parser": "^1.4.7",

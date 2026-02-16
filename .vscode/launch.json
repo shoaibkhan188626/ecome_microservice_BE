@@ -1,0 +1,36 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "name": "Debug API Gateway",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/services/api-gateway",
+      "runtimeExecutable": "node",
+      "args": ["--inspect", "index.js"],
+      "envFile": "${workspaceFolder}/services/api-gateway/.env",
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Debug Auth Service",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/services/auth-service",
+      "runtimeExecutable": "node",
+      "args": ["--inspect=9230", "src/index.js"],
+      "envFile": "${workspaceFolder}/services/auth-service/.env",
+      "console": "integratedTerminal",
+      "restart": true
+    },
+    {
+      "name": "Debug Current Test File",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "args": ["vitest", "run", "${relativeFile}", "--reporter=verbose"],
+      "console": "integratedTerminal"
+    }
+  ]
+}

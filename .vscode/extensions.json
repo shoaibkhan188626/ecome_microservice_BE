@@ -1,0 +1,15 @@
+﻿{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-docker",
+    "mikestead.dotenv",
+    "humao.rest-client",
+    "streetsidesoftware.code-spell-checker",
+    "gruntfuggly.todo-tree",
+    "eamodio.gitlens",
+    "vitest.explorer",
+    "redhat.vscode-yaml",
+    "editorconfig.editorconfig"
+  ]
+}

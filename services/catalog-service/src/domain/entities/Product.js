@@ -10,27 +10,23 @@ const productSchema = new mongoose.Schema(
       maxLength: [200, "Product name too long"],
       index: true,
     },
-
     slug: {
       type: String,
       unique: true,
       lowercase: true,
       index: true,
     },
-
     description: {
       type: String,
       required: [true, "Product description is required"],
       trim: true,
       maxLength: [5000, "Description too long"],
     },
-
     shortDescription: {
       type: String,
       trim: true,
       maxLength: [500, "Short description is too long"],
     },
-
     //category reference
     category: {
       type: mongoose.Schema.Types.ObjectId,
@@ -38,31 +34,26 @@ const productSchema = new mongoose.Schema(
       required: [true, "Category is required"],
       index: true,
     },
-
     //Pricing
     basePrice: {
       type: Number,
       required: [true, "Base price is required"],
       min: [0, "Price cannot be negative"],
     },
-
     salePrice: {
       type: Number,
       min: [0, "Cost price cannot be negative"],
     },
-
     costPrice: {
       type: Number,
       min: [0, "Cost price cannot be negative"],
     },
-
     currency: {
       type: String,
       default: "USD",
       uppercase: true,
       maxLength: 3,
     },
-
     //SKU (Stock keeping unit)
     sku: {
       type: String,
@@ -71,7 +62,6 @@ const productSchema = new mongoose.Schema(
       uppercase: true,
       index: true,
     },
-
     //EAV pattern
     attributes: [
       {
@@ -80,25 +70,21 @@ const productSchema = new mongoose.Schema(
           required: true,
           trim: true,
         },
-
         value: {
           type: mongoose.Schema.Types.Mixed,
           required: true,
         },
-
         type: {
           type: String,
           enum: ["string", "number", "boolean", "array"],
           default: "string",
         },
-
         unit: {
           type: String,
           trim: true,
         },
       },
     ],
-
     //images
     images: [
       {
@@ -106,79 +92,65 @@ const productSchema = new mongoose.Schema(
           type: String,
           required: true,
         },
-
         alt: {
           type: String,
           default: "",
         },
-
         isPrimary: {
           type: Boolean,
           default: false,
         },
-
         order: {
           type: Number,
           default: 0,
         },
       },
     ],
-
     //SEO
     metaTitle: {
       type: String,
       maxLength: [60, "Meta title too long"],
     },
-
     metaDescription: {
       type: String,
       maxLength: [160, "Meta description too long"],
     },
-
     metaKeywords: [String],
-
     productType: {
       type: String,
       enum: ["simple", "variable", "digital", "bundle"],
       default: "simple",
       index: true,
     },
-
     trackInventory: {
       type: Boolean,
       default: true,
     },
-
     stockQuantity: {
       type: Number,
       default: 0,
       min: 0,
     },
-
     lowStockThreshold: {
       type: Number,
       default: 10,
     },
-
     status: {
       type: String,
       enum: ["draft", "active", "inactive", "archived"],
       default: "draft",
       index: true,
     },
-
     isActive: {
       type: Boolean,
       default: true,
       index: true,
     },
-
     isFeatured: {
       type: Boolean,
       default: false,
       index: true,
     },
-
     weight: {
       value: Number,
       unit: {
@@ -187,7 +159,6 @@ const productSchema = new mongoose.Schema(
         default: "kg",
       },
     },
-
     dimensions: {
       length: Number,
       width: Number,
@@ -198,13 +169,11 @@ const productSchema = new mongoose.Schema(
         default: "cm",
       },
     },
-
     brand: {
       type: String,
       trim: true,
       index: true,
     },
-
     tags: [
       {
         type: String,
@@ -212,36 +181,30 @@ const productSchema = new mongoose.Schema(
         lowercase: true,
       },
     ],
-
     viewCount: {
       type: Number,
       default: 0,
     },
-
     purchaseCount: {
       type: Number,
       default: 0,
     },
-
     averageRating: {
       type: Number,
       default: 0,
       min: 0,
       max: 5,
     },
-
     reviewCount: {
       type: Number,
       default: 0,
     },
-
     relatedProducts: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Product",
       },
     ],
-
     vendor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -283,7 +246,6 @@ productSchema.virtual("isOnSale").get(function () {
 /**
  * virtual: calculate discount percentage
  */
-
 productSchema.virtual("discountPercentage").get(function () {
   if (!this.isOnSale) return 0;
   return Math.round(((this.basePrice - this.salePrice) / this.basePrice) * 100);
@@ -299,7 +261,6 @@ productSchema.virtual("effectivePrice").get(function () {
 /**
  * virtual: check stock status
  */
-
 productSchema.virtual("stockStatus").get(function () {
   if (!this.trackInventory) return "in_stock";
   if (this.stockQuantity === 0) return "out_of_stock";
@@ -319,7 +280,6 @@ productSchema.virtual("primaryImage").get(function () {
 /**
  * pre-save hook to generate slug and validate
  */
-
 productSchema.pre("save", async function () {
   // Generate slug from name if not provided
   if (this.isModified("name") && !this.slug) {
@@ -373,8 +333,8 @@ productSchema.pre("save", async function () {
  * @param {Object} filters - Additional filters
  * @returns {Query} mongoose query
  */
-
-productSchema.static.findByCategory = function (categoryId, filters = {}) {
+// FIX: Changed static to statics
+productSchema.statics.findByCategory = function (categoryId, filters = {}) {
   return this.find({
     category: categoryId,
     isActive: true,
@@ -389,8 +349,8 @@ productSchema.static.findByCategory = function (categoryId, filters = {}) {
  * @param {Mixed} attributeValue - Attribute value (e.g., 'Red')
  * @returns {Query} mongoose query
  */
-
-productSchema.static.findByAttribute = function (
+// FIX: Changed static to statics
+productSchema.statics.findByAttribute = function (
   attributeName,
   attributeValue,
 ) {
@@ -423,7 +383,6 @@ productSchema.statics.findFeatured = function (limit = 10) {
  * @param {String} attributeName - Attribute name
  * @returns {Mixed} Attribute value or null
  */
-
 productSchema.methods.getAttributeValue = function (attributeName) {
   const attr = this.attributes.find((a) => a.name === attributeName);
   return attr ? attr.value : null;
@@ -436,7 +395,6 @@ productSchema.methods.getAttributeValue = function (attributeName) {
  * @param {String} type - Attribute type
  * @param {String} unit - Attribute unit (optional)
  */
-
 productSchema.methods.setAttribute = function (
   name,
   value,
@@ -465,7 +423,6 @@ productSchema.methods.incrementViewCount = async function () {
  * instance method : Update stock quantity (basic - full logic in inventory service)
  * @param {Number} quantity - quantity add/subtract
  */
-
 productSchema.methods.adjustStock = async function (quantity) {
   if (!this.trackInventory) return;
 
