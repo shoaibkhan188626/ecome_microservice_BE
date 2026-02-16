@@ -2,22 +2,49 @@
   "name": "ecommerce-platform",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@9.15.0",
   "workspaces": [
     "packages/*",
     "services/*"
   ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
-    "// --- SETUP SCRIPTS ---": "",
-    "bootstrap": "npm install && npm run build:common",
-    "build:common": "npm run build -w @ecommerce/common",
-    "// --- DEVELOPMENT SCRIPTS ---": "",
+    "preinstall": "npx only-allow pnpm",
+    "prepare": "husky",
     "infra": "docker compose up -d mongodb redis rabbitmq",
     "infra:stop": "docker compose stop",
-    "dev": "concurrently -n \"INFRA,GATEWAY,AUTH,CATALOG,INVENTORY,CART,ORDER,NOTIFY\" -c \"gray,magenta,blue,green,yellow,cyan,red,white\" \"npm run infra\" \"npm run dev -w api-gateway\" \"npm run dev -w auth-service\" \"npm run dev -w catalog-service\" \"npm run dev -w inventory-service\" \"npm run dev -w cart-service\" \"npm run dev -w order-service\" \"npm run dev -w notification-service\"",
-    "// --- MAINTENANCE ---": "",
-    "clean": "npm run clean --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "prepare": "husky"
+    "dev": "concurrently -n \"INFRA,GATEWAY,AUTH,CATALOG,INVENTORY,CART,ORDER,NOTIFY\" -c \"gray,magenta,blue,green,yellow,cyan,red,white\" \"pnpm infra\" \"pnpm --filter api-gateway dev\" \"pnpm --filter auth-service dev\" \"pnpm --filter catalog-service dev\" \"pnpm --filter inventory-service dev\" \"pnpm --filter cart-service dev\" \"pnpm --filter order-service dev\" \"pnpm --filter notification-service dev\"",
+    "dev:gateway": "pnpm --filter api-gateway dev",
+    "dev:auth": "pnpm --filter auth-service dev",
+    "dev:catalog": "pnpm --filter catalog-service dev",
+    "dev:cart": "pnpm --filter cart-service dev",
+    "dev:order": "pnpm --filter order-service dev",
+    "dev:payment": "pnpm --filter payment-service dev",
+    "dev:inventory": "pnpm --filter inventory-service dev",
+    "dev:notification": "pnpm --filter notification-service dev",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "format": "prettier --write \"**/*.{js,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{js,json,md,yml,yaml}\"",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down -v",
+    "docker:build": "docker compose build --parallel",
+    "docker:logs": "docker compose logs -f",
+    "clean": "turbo run clean && rimraf node_modules",
+    "build:common": "pnpm --filter @ecommerce/common build"
+  },
+  "lint-staged": {
+    "*.{js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",
