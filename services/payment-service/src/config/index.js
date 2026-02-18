@@ -1,68 +1,101 @@
-import { BaseConfig } from "@ecommerce/common";
+import { BaseConfig } from '@ecommerce/common';
+import { configSchema } from './config-schema.js';
 
 class Config extends BaseConfig {
+  constructor() {
+    super();
+    this.validateEnv();
+  }
+
+  validateEnv() {
+    const { error, value } = configSchema.validate(process.env, {
+      abortEarly: false,
+      convert: true,
+    });
+
+    if (error) {
+      const errors = error.details.map((detail) => detail.message).join('\n');
+      throw new Error(`Configuration validation failed:\n${errors}`);
+    }
+
+    // Store validated values
+    this._validatedEnv = value;
+  }
+
   getRequiredEnvVars() {
-    return ["PORT", "MONGODB_URI"];
+    return [
+      'PORT',
+      'MONGODB_URI',
+      'REDIS_URL',
+      'RABBITMQ_URL',
+      'RAZORPAY_KEY_ID',
+      'RAZORPAY_KEY_SECRET',
+      'RAZORPAY_WEBHOOK_SECRET',
+    ];
   }
 
   get port() {
-    return parseInt(process.env.PORT, 10) || 3006;
+    return this._validatedEnv.PORT;
   }
 
   get nodeEnv() {
-    return process.env.NODE_ENV || "development";
+    return this._validatedEnv.NODE_ENV;
   }
 
   get isDevelopment() {
-    return this.nodeEnv !== "production";
+    return this.nodeEnv !== 'production';
   }
 
   get isProduction() {
-    return this.nodeEnv === "production";
+    return this.nodeEnv === 'production';
   }
 
   get logLevel() {
-    return process.env.LOG_LEVEL || "info";
+    return this._validatedEnv.LOG_LEVEL;
   }
 
   get mongoUri() {
-    return process.env.MONGODB_URI;
+    return this._validatedEnv.MONGODB_URI;
   }
 
   get redisUrl() {
-    return process.env.REDIS_URL;
+    return this._validatedEnv.REDIS_URL;
   }
 
   get rabbitmqUrl() {
-    return process.env.RABBITMQ_URL;
+    return this._validatedEnv.RABBITMQ_URL;
   }
 
   get allowedOrigins() {
-    return process.env.ALLOWED_ORIGINS || "*";
+    return this._validatedEnv.ALLOWED_ORIGINS;
   }
 
   get razorPay() {
     return {
-      keyId: process.env.RAZORPAY_KEY_ID,
-      keySecret: process.env.RAZORPAY_KEY_SECRET,
-      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+      keyId: this._validatedEnv.RAZORPAY_KEY_ID,
+      keySecret: this._validatedEnv.RAZORPAY_KEY_SECRET,
+      webhookSecret: this._validatedEnv.RAZORPAY_WEBHOOK_SECRET,
     };
   }
 
   get stripe() {
     return {
-      secretKey: process.env.STRIPE_SECRET_KEY,
-      webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+      secretKey: this._validatedEnv.STRIPE_SECRET_KEY,
+      webhookSecret: this._validatedEnv.STRIPE_WEBHOOK_SECRET,
+      publishableKey: this._validatedEnv.STRIPE_PUBLISHABLE_KEY,
     };
   }
 
   get defaultCurrency() {
-    return process.env.DEFAULT_CURRENCY || "INR";
+    return this._validatedEnv.DEFAULT_CURRENCY;
   }
 
   get defaultProvider() {
-    return process.env.DEFAULT_PROVIDER || "razorpay";
+    return this._validatedEnv.DEFAULT_PROVIDER;
+  }
+
+  get isStripeEnabled() {
+    return Boolean(this._validatedEnv.STRIPE_SECRET_KEY);
   }
 }
 
